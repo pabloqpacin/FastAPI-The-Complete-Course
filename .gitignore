@@ -1,3 +1,9 @@
+# custom
+*mock*
+
+# python et al.
+.venv/
+
 /fastapienv/
 /.idea/FastAPI-The-Complete-Course.iml
 /.idea/misc.xml
