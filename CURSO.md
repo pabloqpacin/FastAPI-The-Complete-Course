@@ -4,6 +4,7 @@
   - [1. Introduction](#1-introduction)
   - [2. Python Installation \& Refresher](#2-python-installation--refresher)
       - [1. Intro: Python Installation (Linux) + IDE](#1-intro-python-installation-linux--ide)
+    - [(Fundamentos de programación)](#fundamentos-de-programación)
       - [2. Comments and Variables](#2-comments-and-variables)
       - [3. String formatting](#3-string-formatting)
       - [4. Getting User Input](#4-getting-user-input)
@@ -14,16 +15,18 @@
       - [9. Loops](#9-loops)
       - [10. Dictionaries](#10-dictionaries)
       - [11. Functions](#11-functions)
-      - [12. Imports \& Standard Library](#12-imports--standard-library)
-      - [13. OOP](#13-oop)
-      - [14. Abstraction](#14-abstraction)
-      - [15. Constructors](#15-constructors)
-      - [16. Encapsulation](#16-encapsulation)
-      - [17. Inheritance](#17-inheritance)
-      - [18. Self vs Super](#18-self-vs-super)
-      - [19. Inheritance](#19-inheritance)
-      - [20. Polymorphism](#20-polymorphism)
-      - [21. Outro: Time to battle, Composition, Hero Battle](#21-outro-time-to-battle-composition-hero-battle)
+    - [12. Imports \& Standard Library](#12-imports--standard-library)
+    - [(OOP Game!)](#oop-game)
+      - [13. OOP Overview](#13-oop-overview)
+      - [14. Game Overview](#14-game-overview)
+      - [15. Abstraction](#15-abstraction)
+      - [16. Constructors (`Bar` in `foo = Bar()`)](#16-constructors-bar-in-foo--bar)
+      - [17. Encapsulation](#17-encapsulation)
+      - [18. Inheritance 1/2](#18-inheritance-12)
+      - [19. Self vs Super](#19-self-vs-super)
+      - [20. Inheritance 2/2](#20-inheritance-22)
+      - [21. Polymorphism](#21-polymorphism)
+  - [21. Composition](#21-composition)
   - [3. FastAPI Overview](#3-fastapi-overview)
   - [4. FastAPI Setup \& Installation](#4-fastapi-setup--installation)
   - [5. Project 1 - FastAPI Request Method Logic](#5-project-1---fastapi-request-method-logic)
@@ -48,7 +51,11 @@
 
 ## 2. Python Installation & Refresher
 
+<details>
+
 #### 1. Intro: Python Installation (Linux) + IDE
+
+<details>
 
 > [!IMPORTANT]
 > Custom setup for my Pop!_OS 22.04 workstation with the ~~*pycharm*~~ **vscodium** IDE
@@ -86,6 +93,13 @@ source .venv/bin/activate
 
 deactivate
 ```
+
+</details>
+
+### (Fundamentos de programación)
+
+<details>
+<summary>Fundamentos de programación</summary>
 
 #### 2. Comments and Variables
 
@@ -500,17 +514,6 @@ else:
   # 1
   # 2
   # 4
-i=0
-
-while i<5:
-  i+=1
-  if i==3:
-    continue
-  print(i)
-  if i==4:
-    break
-else:
-  print("i is now larger or equal to 5")
 ```
 
 Loops Assignment
@@ -673,7 +676,6 @@ print_my_name("Pablo","Quevedo")
   # Hello Pablo Quevedo!
 
 # ---
-
 def print_color_red():
   color="Red"
   print(color)
@@ -681,12 +683,10 @@ def print_color_red():
 color="Blue"
 print(color)
 print_color_red()
-
   # Blue
   # Red
 
 # ---
-
 def print_numbers(high,low):
   print(high)
   print(low)
@@ -696,7 +696,6 @@ print_numbers(low=3,high=10)
   # 3
 
 # ---
-
 def multiply_numbers(a,b):
   return a*b
 
@@ -705,7 +704,6 @@ print(solution)
   # 60
 
 # ---
-
 def print_list(list_of_numbers):
   for x in list_of_numbers:
     print(x)
@@ -719,7 +717,6 @@ print_list(number_list)
   # 5
 
 # ---
-
 def buy_item(cost_of_item):
   return cost_of_item + add_tax_to_item(cost_of_item)
 
@@ -751,9 +748,14 @@ solution_dictionary=user_dictionary(firstname='sup',lastname='dawg',age=69)
   # {'firstname': 'sup', 'lastname': 'dawg', 'age': 69}
 ```
 
-#### 12. Imports & Standard Library
+</details>
 
-> [!WARNING]
+### 12. Imports & Standard Library
+
+<details>
+<summary>uso del import</summary>
+
+> [!NOTE]
 > Ojo: uso de varios archivos ~~sin Imports/~~
 
 ```tree
@@ -797,7 +799,7 @@ python3 tests/b.py
 Standard Library
 
 ```py
-# == Random==
+# == Random ==
 import random
 
 types_of_drinks=['Soda','Coffee','Water','Tea']
@@ -806,32 +808,476 @@ print(random.choice(types_of_drinks))
 print(random.randint(1,10))
 
 
-# == Math==
+# == Math ==
 import math
 square_root=math.sqrt(64)
 print(square_root)
   # 8.0
 
 
-# == ...==
-# ....
+# == ...= =
+# ...
 ```
 
-#### 13. OOP
+</details>
+
+### (OOP Game!)
+
+<details>
+<summary>OOP Game</summary>
+
+#### 13. OOP Overview
 
 > [!NOTE]
-> Ver presentación en [./docs/FastAPI_slides.pdf](/docs/FastAPI_slides.pdf)
+> Ver diapositivas (249-...) en [./docs/FastAPI_slides.pdf](/docs/FastAPI_slides.pdf) <br>
+> y el juego en [./00-oop_game/](/00-oop_game/)
 
-#### 14. Abstraction
-#### 15. Constructors
-#### 16. Encapsulation
-#### 17. Inheritance
-#### 18. Self vs Super
-#### 19. Inheritance
-#### 20. Polymorphism
-#### 21. Outro: Time to battle, Composition, Hero Battle
+- Paradigm for Scalability, Efficiency and Reusability
+- Object definition by Behavior ~~(what it do)~~ VS State ~~(what it be)~~
+- Primitive data type example below: **just variables, not a dawg object**!
+
+```py
+# main.py
+legs:int=4
+ears:int=2
+type:str='Goldendoodle'
+age:int=5
+color:str='Yellow'
+```
+
+- Crear objetos en Python
+
+```py
+# dawg.py
+class Dog:
+  legs:int=4
+  ears:int=2
+  type:str='Goldendoodle'
+  age:int=5
+  color:str='Yellow'
+```
+```py
+# main.py
+from Dog import *
+
+dog = Dog()
+
+# en este caso, asignación estática pero ta bien
+dog.legs    # 4
+dog.ears    # 2
+dog.type    # 'Goldendoodle'
+dog.age     # 5
+dog.color   # 'Yellow'
+```
+
+- 4 pillars of OOP: Encapsulation, Abstraction, Inheritance, Polymorphism
 
 
+#### 14. Game Overview
+
+Acceptance Criteria
+
+```md
+- Enemies that can fight one another
+- Different types of enemies: Zombie, Ogre...
+- Each enemy has different powers, health points and attack damage
+```
+
+Focus on: 4 pillars of OOP
+
+What do we need
+
+```md
+Enemy Object:
+- Name / Type of enemy
+- Health points
+- Attack damage
+```
+
+CODE
+
+```tree
+ 00-oop_game
+├──  __pycache__
+│  └──  enemy.cpython-310.pyc
+├──  enemy.py
+└──  main.py
+```
+```py
+# enemy.py
+class Enemy:
+    type_of_enemy: str
+    health_points: int = 10
+    attack_damage: int = 1
+```
+```py
+# main.py
+from enemy import *
+
+enemy = Enemy()
+
+# enemy2 = Enemy()
+# enemy2.health_points = 100
+# print(enemy2.health_points)
+
+enemy.type_of_enemy='Zombie'
+
+print(f'{enemy.type_of_enemy} has '
+        f'{enemy.health_points} health points '
+        f'and can do attack of {enemy.attack_damage}')
+```
+```bash
+python3 00-oop_game/main.py
+  # Zombie has 10 health points and can do attack of 1
+```
+
+#### 15. Abstraction
+
+> [!TIP]
+> Usar `self` para referirse al objeto dentro del class file
+
+- Hide implementation from the users it just works! ~~(via **methods** aka functions calls aye)~~
+- Create simple and reusable code, following DRY principle
+- Enables Python objects to become more scalable
+
+
+```py
+# enemy.py
+
+    # ...
+    def talk(self):
+        print(f'I am a {self.type_of_enemy}. Be prepared to fight.')
+
+    def walk_forward(self):
+        print(f'{self.type_of_enemy} moves closer to you.')
+
+    def attack(self):
+        print(f'{self.type_of_enemy} attacks for {self.attack_damage} damage.')
+```
+```py
+# main.py
+
+# ...
+enemy.talk()
+enemy.walk_forward()
+enemy.attack()
+```
+```bash
+python3 00-oop_game/main.py
+  # Zombie has 10 health points and can do attack of 1
+  # I am a Zombie. Be prepared to fight.
+  # Zombie moves closer to you.
+  # Zombie attacks for 1 damage.
+```
+
+#### 16. Constructors (`Bar` in `foo = Bar()`)
+
+- Are used to create and initialize an object of a class with or without using values
+- 3 different types:
+  - Default/Empty Constructors
+  - No Argument Constructors
+  - Parameter Constructors
+
+> `enemy.py`
+
+```py
+# Default/Empty Constructors
+# Optional since it's created by default if no Arguments
+# Empty constructor, what should happen when we instantiate this object
+  # ...
+  def __init__(self):
+    pass
+```
+```py
+# No Argument Constructors
+  # ...
+  def __init__(self):
+    print('New enemy created with no starting values')
+```
+```py
+# Parameter Constructors
+class Enemy:
+  def __init__(self,type_of_enemy,health_points=10,attack_damage=1):
+    self.type_of_enemy=type_of_enemy
+    self.health_points=health_points
+    self.attack_damage=attack_damage
+  def talk(self):
+    print('I am an enemy')
+
+# ---
+# main.py
+
+enemy0 = Enemy('Zombie')
+enemy1 = Enemy('Zombie',15,3)
+```
+
+#### 17. Encapsulation
+
+- Bundling of data
+- Usecase: we don't want `zombie.type_of_enemy='Orc'` to happen (overwrite type etc.)
+- Implementation:
+  - Change public attributes to private with double underscore (`self.__type_of_enemy`)
+  - Usage of Getters and Setters (`def get_foo`, `def set_foo`)
+- Keeps related fields and methods together; makes code cleaner, flexible and reusable
+
+```py
+# enemy.py
+class Enemy:
+  def __init__(self,type_of_enemy,health_points=10,attack_damage=1):
+    self.__type_of_enemy=type_of_enemy  # private: can't be changed when instanciated
+    self.health_points=health_points    # public: can be changed when instanciated
+    self.attack_damage=attack_damage    # public: can be changed when instanciated
+
+  def get_type_of_enemy(self):
+    return self.__type_of_enemy
+```
+```py
+# main.py
+zombie = Enemy('Zombie',15,3)
+zombie.talk()
+print(zombie.health_points)
+print(zombie.get_type_of_enemy())
+```
+
+#### 18. Inheritance 1/2
+
+- Process of acquiring properties from one class to others, creating a hierarchy between them (Parent and Child clases)
+- Method overriding: child class inherits a method from the parent, but can be overwritten
+
+```py
+# classes.py
+class Animal:
+  weight: int
+  color: str
+  age: int
+  animal_type: str
+
+  def eat(self):
+    print('Animal eating')
+  def sleep(self):
+    print('Animal sleeping')
+
+class Dog(Animal):
+  # All Animal Attributes
+  can_shed: bool
+  domestic_name: str
+
+  # All Animal Methods
+  def talk(self):
+    print('Bark!')
+  def eat(self):
+    print('Chews on bone!')
+
+# ---
+# main.py
+
+dog = Dog()
+dog.eat()
+```
+
+#### 19. Self vs Super
+
+> [!TIP]
+> `self` VS `super` explained
+
+- **self**:
+  - refers to the current object that is created or being instantiated
+  - <u>differenciates between the instance variables & parameters with the same name</u>
+- **super**:
+  - refers to the parent class
+  - calls the parent class methods and constructors
+
+```py
+class Person:
+  def __init__(self,name,age):
+    self.name=name
+    self.age=age
+
+class Student(Person):
+  def __init__(self,name,age,degree):
+    super().__init__(name=name,age=age)
+    self.degree=degree
+```
+
+#### 20. Inheritance 2/2
+
+> [!NOTE]
+> Archivos en [./00-oop_game/](/00-oop_game/)
+
+- Parent class `Enemy()` with two children classes `Zombie()` and `Ogre()`
+- Children classes instantiated with `super().__init__(args)` <!--`__init__`==constructor-->
+
+```py
+# enemy.py
+
+class Enemy:
+    def __init__(self,type_of_enemy,health_points=10,attack_damage=1):
+        self.__type_of_enemy=type_of_enemy  # private: can't be changed when instanciated (encapsulation)
+        self.health_points=health_points    # public: can be changed when instanciated
+        self.attack_damage=attack_damage    # "
+    def get_type_of_enemy(self):
+        return self.__type_of_enemy
+    # def set_type_of_enemy(self,type_of_enemy):
+    #     self.__type_of_enemy=type_of_enemy
+
+    def talk(self):
+        print(f'I am a {self.__type_of_enemy}. Be prepared to fight.')
+    def walk_forward(self):
+        print(f'{self.__type_of_enemy} moves closer to you.')
+    def attack(self):
+        print(f'{self.__type_of_enemy} attacks for {self.attack_damage} damage.')
+```
+```py
+# zombie.py
+class Zombie(Enemy):
+    def __init__(self,health_points,attack_damage):
+        super().__init__(type_of_enemy='Zombie',health_points=health_points,attack_damage=attack_damage)
+            # Inheritance
+
+        def talk(self):
+            print('*Grumbling...')
+            # Method Overriding
+        def spread_disease(self):
+            print('The zombie is trying to spread infection')
+```
+```py
+# ogre.py
+class Ogre(Enemy):
+    def __init__(self,health_points,attack_damage):
+        super().__init__(type_of_enemy='Ogre',health_points=health_points,attack_damage=attack_damage)
+            # Inheritance
+
+        def talk(self):
+            print('Ogre is slamming hands all around.')
+            # Method Overriding
+```
+```py
+# main.py
+from zombie import *
+from ogre import *
+
+zombie = Zombie(10,1)
+ogre = Ogre(20,3)
+
+print(f'{zombie.get_type_of_enemy()} has '
+      f'{zombie.health_points} health points '
+      f'and can do attack of {zombie.attack_damage}')
+
+print(f'{ogre.get_type_of_enemy()} has '
+      f'{ogre.health_points} health points '
+      f'and can do attack of {ogre.attack_damage}')
+
+zombie.talk()
+ogre.talk()
+```
+
+#### 21. Polymorphism
+
+- many forms aye... the children classes chan still act as the parent (`def battle(e: Enemy): foo`)
+- changing an object (`animal`...) at a specific runtime
+
+```py
+# classes.py
+
+class Animal:
+  # ...
+  def talk(self):
+    print('Does not make a sound')
+class Dog(Animal):
+  # ...
+  def talk(self):
+    print('Bark!')
+class Bird(Animal):
+  # ...
+  def talk(self):
+    print('Chirp!')
+
+# ---
+# main.py
+
+zoo: Animal=[]
+
+dog = Animal()
+dog2 = Dog()
+bird = Bird()
+
+# This will work
+zoo.apend(dog)
+zoo.apend(dog2)
+zoo.apend(bird)
+
+for animal in zoo:
+  animal.talk()
+  # ...
+  # Bark!
+  # Chirp
+```
+
+- create new battle function in `main.py`
+
+```py
+from enemy import *
+from zombie import *
+from ogre import *
+
+def battle(e: Enemy):
+    e.talk()
+    e.attack()
+
+zombie = Zombie(10,1)
+ogre = Ogre(20,3)
+
+print(f'({zombie.get_type_of_enemy()} has '
+      f'{zombie.health_points} health points '
+      f'and can do attack of {zombie.attack_damage})')
+
+print(f'({ogre.get_type_of_enemy()} has '
+      f'{ogre.health_points} health points '
+      f'and can do attack of {ogre.attack_damage})')
+
+battle(zombie)
+battle(ogre)
+```
+
+- create a special attack: default at the parent class, specifics at the children classes (ver [./00-oop_game/](/00-oop_game/))
+
+
+## 21. Composition
+
+- Create objects made up of other objects, providing layered functionality
+- A class contains one or more objects of another class as instance variables
+- Known as a HAS-A relationship (not an IS-A)
+- In the example, a vehicle must have an engine, but an engine does not need to have a vehicle
+
+```py
+class Engine:
+  def __init__(self,engineType):
+    self.engineType=engineType
+  def startEngine(self):
+    print("Engine is running")
+  def stopEngine(self):
+    print("Engine is off")
+
+class Vehicle:
+  def __init__(self,type,forSale,engine):
+    self.type=type
+    self.forSale=forSale
+    self.engine=engine
+
+engine = Engine("V6")
+vehicle = Vehicle("Car",True,engine)
+vehicle.engine.startEngine()
+  # Engine is running
+```
+
+- Implementación en [./00-oop_game/](/00-oop_game/)
+  - crear clases Hero y Weapon, con una relación HAS-A!!
+
+
+
+</details>
+
+</details>
 
 ## 3. FastAPI Overview
 
