@@ -26,7 +26,7 @@
       - [19. Self vs Super](#19-self-vs-super)
       - [20. Inheritance 2/2](#20-inheritance-22)
       - [21. Polymorphism](#21-polymorphism)
-  - [21. Composition](#21-composition)
+      - [21. Composition](#21-composition)
   - [3. FastAPI Overview](#3-fastapi-overview)
   - [4. FastAPI Setup \& Installation](#4-fastapi-setup--installation)
   - [5. Project 1 - FastAPI Request Method Logic](#5-project-1---fastapi-request-method-logic)
@@ -1242,7 +1242,7 @@ battle(ogre)
 - create a special attack: default at the parent class, specifics at the children classes (ver [./00-oop_game/](/00-oop_game/))
 
 
-## 21. Composition
+#### 21. Composition
 
 - Create objects made up of other objects, providing layered functionality
 - A class contains one or more objects of another class as instance variables
