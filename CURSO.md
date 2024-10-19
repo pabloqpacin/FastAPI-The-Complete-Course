@@ -28,8 +28,17 @@
       - [21. Polymorphism](#21-polymorphism)
       - [21. Composition](#21-composition)
   - [3. FastAPI Overview](#3-fastapi-overview)
-  - [4. FastAPI Setup \& Installation](#4-fastapi-setup--installation)
+  - [4. FastAPI Setup \& Installation (`pip` \& `venv`)](#4-fastapi-setup--installation-pip--venv)
   - [5. Project 1 - FastAPI Request Method Logic](#5-project-1---fastapi-request-method-logic)
+    - [1. Intro](#1-intro)
+    - [2. GET Request 1/2](#2-get-request-12)
+    - [3. GET Request 2/2](#3-get-request-22)
+    - [4. Path Parameters](#4-path-parameters)
+    - [5. Query Parameters](#5-query-parameters)
+    - [6. POST Request](#6-post-request)
+    - [7. PUT Request](#7-put-request)
+    - [8. DELETE Request](#8-delete-request)
+    - [9. *Assignment*](#9-assignment)
   - [6. Project 2 - Move Fast with FastAPI](#6-project-2---move-fast-with-fastapi)
   - [7. Project 3 - Complete RESTful APIs](#7-project-3---complete-restful-apis)
   - [8. Setup Database](#8-setup-database)
@@ -51,11 +60,11 @@
 
 ## 2. Python Installation & Refresher
 
-<details>
+<!-- <details> -->
 
 #### 1. Intro: Python Installation (Linux) + IDE
 
-<details>
+<!-- <details> -->
 
 > [!IMPORTANT]
 > Custom setup for my Pop!_OS 22.04 workstation with the ~~*pycharm*~~ **vscodium** IDE
@@ -64,11 +73,12 @@
 sudo apt get install -y --no-install-recommends \
   python3-pip python3-venv
 
-python3 --version
+python3 --version && python3 -c 'print("Hello World!")'
   # Python 3.10.12
-
-python3 -c 'print("Hello World!")'
   # Hello World!
+
+python3 -m pip --version  # && pip install pip-autoremove -y
+  # pip 22.0.2 from /home/pabloqpacin/repos/FastAPI-The-Complete-Course/.venv/lib/python3.10/site-packages/pip (python 3.10)
 
 # ---
 codium --version
@@ -78,7 +88,7 @@ codium --version
 ```
 
 > [!TIP]
-> Uso de virtual environments (`venv`) en este repo
+> Uso de virtual environments (`venv`) en este repo para **instalar FastAPI**
 
 ```bash
 # cd ~/repos/FastAPI-The-Complete-Course
@@ -87,14 +97,14 @@ python3 -m venv .venv
 # ---
 source .venv/bin/activate
 
-# pip install ...
+# pip install "fastapi[standard]"
 # ...
 # pip freeze > requirements.txt
 
 deactivate
 ```
 
-</details>
+<!-- </details> -->
 
 ### (Fundamentos de programación)
 
@@ -753,7 +763,7 @@ solution_dictionary=user_dictionary(firstname='sup',lastname='dawg',age=69)
 ### 12. Imports & Standard Library
 
 <details>
-<summary>uso del import</summary>
+<summary>Uso básico de `import`</summary>
 
 > [!NOTE]
 > Ojo: uso de varios archivos ~~sin Imports/~~
@@ -824,7 +834,7 @@ print(square_root)
 ### (OOP Game!)
 
 <details>
-<summary>OOP Game</summary>
+<summary>Paso-a-paso del `00-oop_game/`</summary>
 
 #### 13. OOP Overview
 
@@ -1277,12 +1287,490 @@ vehicle.engine.startEngine()
 
 </details>
 
-</details>
+<!-- </details> -->
+
+---
+
 
 ## 3. FastAPI Overview
 
-## 4. FastAPI Setup & Installation
+> [!NOTE]
+> Ver diapositivas (21-...) en [./docs/FastAPI_slides.pdf](/docs/FastAPI_slides.pdf)
+
+- **[FastAPI](https://fastapi.tiangolo.com/)**: web-framework for building modern RESTful APIs
+- **Características**: fast performance and fast development: few bugs, quick & easy, robust, standards ([OpenAPI](https://www.openapis.org/) ([Swagger](https://swagger.io/specification/)) & [JsonSchema](https://json-schema.org/))
+- **Roles**: 
+  - **FastAPI** handles all business logic for the application. Nowadays any webpage communicates with a server application through RESTful APIs, requesting data from the backend server (business logic). So **FastAPI** ensures the webpage is getting correct and secure data for the users to interact with.
+  - **FastAPI** can also leverage additional tools to create full stack applications, where FastAPI also renders the front web page
+
+
+> [!IMPORTANT]
+> En el curso crearemos tanto FastAPI RESTful applications como full stack applications.
+
+
+## 4. FastAPI Setup & Installation (`pip` & `venv`)
+
+> [!NOTE]
+> Ver diapositivas (11-...) en [./docs/FastAPI_slides.pdf](/docs/FastAPI_slides.pdf) <br>
+> Ver comandos para instalación en Linux más arriba en '*# 2.1 Intro: ...*'
+
+<!-- - Isolate dependencies (eg. `uvicorn` etc.) thru dedicated environments to maintain lean systems -->
+
+<!-- 
+```bash
+# Listar pip packages en la workstation (ho lee fuk)
+pip list | wc -l
+  # 182
+
+# Crear FastAPI project
+mkdir project-foo && cd $_
+python3 -m venv .fastapivenv
+
+source .venv/bin/activate
+pip list | wc -l
+  # 2
+pip install "fastapi[standard]"
+  # ...
+pip list | wc -l
+  # 38
+```
+ -->
+
+<!-- 
+```bash
+pip install "fastapi[standard]"
+  # Collecting fastapi[standard]
+  #   Using cached fastapi-0.115.2-py3-none-any.whl (94 kB)
+  # Collecting typing-extensions>=4.8.0
+  #   Using cached typing_extensions-4.12.2-py3-none-any.whl (37 kB)
+  # Collecting starlette<0.41.0,>=0.37.2
+  #   Using cached starlette-0.40.0-py3-none-any.whl (73 kB)
+  # Collecting pydantic!=1.8,!=1.8.1,!=2.0.0,!=2.0.1,!=2.1.0,<3.0.0,>=1.7.4
+  #   Using cached pydantic-2.9.2-py3-none-any.whl (434 kB)
+  # Collecting email-validator>=2.0.0
+  #   Downloading email_validator-2.2.0-py3-none-any.whl (33 kB)
+  # Collecting httpx>=0.23.0
+  #   Downloading httpx-0.27.2-py3-none-any.whl (76 kB)
+  #     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 76.4/76.4 KB 4.0 MB/s eta 0:00:00
+  # Collecting uvicorn[standard]>=0.12.0
+  #   Downloading uvicorn-0.32.0-py3-none-any.whl (63 kB)
+  #     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 63.7/63.7 KB 17.1 MB/s eta 0:00:00
+  # Collecting python-multipart>=0.0.7
+  #   Downloading python_multipart-0.0.12-py3-none-any.whl (23 kB)
+  # Collecting jinja2>=2.11.2
+  #   Downloading jinja2-3.1.4-py3-none-any.whl (133 kB)
+  #     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 133.3/133.3 KB 22.2 MB/s eta 0:00:00
+  # Collecting fastapi-cli[standard]>=0.0.5
+  #   Downloading fastapi_cli-0.0.5-py3-none-any.whl (9.5 kB)
+  # Collecting dnspython>=2.0.0
+  #   Downloading dnspython-2.7.0-py3-none-any.whl (313 kB)
+  #     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 313.6/313.6 KB 18.5 MB/s eta 0:00:00
+  # Collecting idna>=2.0.0
+  #   Using cached idna-3.10-py3-none-any.whl (70 kB)
+  # Collecting typer>=0.12.3
+  #   Downloading typer-0.12.5-py3-none-any.whl (47 kB)
+  #     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 47.3/47.3 KB 26.8 MB/s eta 0:00:00
+  # Collecting certifi
+  #   Downloading certifi-2024.8.30-py3-none-any.whl (167 kB)
+  #     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 167.3/167.3 KB 8.7 MB/s eta 0:00:00
+  # Collecting sniffio
+  #   Using cached sniffio-1.3.1-py3-none-any.whl (10 kB)
+  # Collecting httpcore==1.*
+  #   Downloading httpcore-1.0.6-py3-none-any.whl (78 kB)
+  #     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 78.0/78.0 KB 43.0 MB/s eta 0:00:00
+  # Collecting anyio
+  #   Using cached anyio-4.6.2.post1-py3-none-any.whl (90 kB)
+  # Collecting h11<0.15,>=0.13
+  #   Downloading h11-0.14.0-py3-none-any.whl (58 kB)
+  #     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 58.3/58.3 KB 27.9 MB/s eta 0:00:00
+  # Collecting MarkupSafe>=2.0
+  #   Downloading MarkupSafe-3.0.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (20 kB)
+  # Collecting pydantic-core==2.23.4
+  #   Using cached pydantic_core-2.23.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+  # Collecting annotated-types>=0.6.0
+  #   Using cached annotated_types-0.7.0-py3-none-any.whl (13 kB)
+  # Collecting click>=7.0
+  #   Using cached click-8.1.7-py3-none-any.whl (97 kB)
+  # Collecting watchfiles>=0.13
+  #   Downloading watchfiles-0.24.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (425 kB)
+  #     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 425.7/425.7 KB 82.6 MB/s eta 0:00:00
+  # Collecting pyyaml>=5.1
+  #   Downloading PyYAML-6.0.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (751 kB)
+  #     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 751.2/751.2 KB 74.0 MB/s eta 0:00:00
+  # Collecting uvloop!=0.15.0,!=0.15.1,>=0.14.0
+  #   Downloading uvloop-0.21.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.8 MB)
+  #     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.8/3.8 MB 64.3 MB/s eta 0:00:00
+  # Collecting httptools>=0.5.0
+  #   Downloading httptools-0.6.4-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (442 kB)
+  #     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 442.1/442.1 KB 32.2 MB/s eta 0:00:00
+  # Collecting python-dotenv>=0.13
+  #   Downloading python_dotenv-1.0.1-py3-none-any.whl (19 kB)
+  # Collecting websockets>=10.4
+  #   Downloading websockets-13.1-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (164 kB)
+  #     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 164.1/164.1 KB 93.1 MB/s eta 0:00:00
+  # Collecting exceptiongroup>=1.0.2
+  #   Using cached exceptiongroup-1.2.2-py3-none-any.whl (16 kB)
+  # Collecting shellingham>=1.3.0
+  #   Downloading shellingham-1.5.4-py2.py3-none-any.whl (9.8 kB)
+  # Collecting rich>=10.11.0
+  #   Downloading rich-13.9.2-py3-none-any.whl (242 kB)
+  #     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 242.1/242.1 KB 59.7 MB/s eta 0:00:00
+  # Collecting markdown-it-py>=2.2.0
+  #   Using cached markdown_it_py-3.0.0-py3-none-any.whl (87 kB)
+  # Collecting pygments<3.0.0,>=2.13.0
+  #   Downloading pygments-2.18.0-py3-none-any.whl (1.2 MB)
+  #     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 68.8 MB/s eta 0:00:00
+  # Collecting mdurl~=0.1
+  #   Using cached mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+  # Installing collected packages: websockets, uvloop, typing-extensions, sniffio, shellingham, pyyaml, python-multipart, python-dotenv, pygments, mdurl, MarkupSafe, idna, httptools, h11, exceptiongroup, dnspython, click, certifi, annotated-types, uvicorn, pydantic-core, markdown-it-py, jinja2, httpcore, email-validator, anyio, watchfiles, starlette, rich, pydantic, httpx, typer, fastapi, fastapi-cli
+  # Successfully installed MarkupSafe-3.0.2 annotated-types-0.7.0 anyio-4.6.2.post1 certifi-2024.8.30 click-8.1.7 dnspython-2.7.0 email-validator-2.2.0 exceptiongroup-1.2.2 fastapi-0.115.2 fastapi-cli-0.0.5 h11-0.14.0 httpcore-1.0.6 httptools-0.6.4 httpx-0.27.2 idna-3.10 jinja2-3.1.4 markdown-it-py-3.0.0 mdurl-0.1.2 pydantic-2.9.2 pydantic-core-2.23.4 pygments-2.18.0 python-dotenv-1.0.1 python-multipart-0.0.12 pyyaml-6.0.2 rich-13.9.2 shellingham-1.5.4 sniffio-1.3.1 starlette-0.40.0 typer-0.12.5 typing-extensions-4.12.2 uvicorn-0.32.0 uvloop-0.21.0 watchfiles-0.24.0 websockets-13.1
+
+pip list
+  # Package           Version
+  # ----------------- -----------
+  # annotated-types   0.7.0
+  # anyio             4.6.2.post1
+  # certifi           2024.8.30
+  # click             8.1.7
+  # dnspython         2.7.0
+  # email_validator   2.2.0
+  # exceptiongroup    1.2.2
+  # fastapi           0.115.2
+  # fastapi-cli       0.0.5
+  # h11               0.14.0
+  # httpcore          1.0.6
+  # httptools         0.6.4
+  # httpx             0.27.2
+  # idna              3.10
+  # Jinja2            3.1.4
+  # markdown-it-py    3.0.0
+  # MarkupSafe        3.0.2
+  # mdurl             0.1.2
+  # pip               22.0.2
+  # pydantic          2.9.2
+  # pydantic_core     2.23.4
+  # Pygments          2.18.0
+  # python-dotenv     1.0.1
+  # python-multipart  0.0.12
+  # PyYAML            6.0.2
+  # rich              13.9.2
+  # setuptools        59.6.0
+  # shellingham       1.5.4
+  # sniffio           1.3.1
+  # starlette         0.40.0
+  # typer             0.12.5
+  # typing_extensions 4.12.2
+  # uvicorn           0.32.0
+  # uvloop            0.21.0
+  # watchfiles        0.24.0
+  # websockets        13.1
+```
+ -->
+
+
 ## 5. Project 1 - FastAPI Request Method Logic
+
+
+> [!TIP]
+> Para consultar los endpoints en el navegador web (al margen de Swagger en `docs/`), usar Firefox o alguna extensión para chrome-based browsers. <br>
+> Otras opciones son usar `curl` + `jq` en la terminal <!--(ver [.utils/workstation.sh](#))--> o la aplicación de escritorio `postman` ~~(instalación de postman!!)~~
+
+
+
+<details>
+
+### 1. Intro
+
+> Diapositivas (26-...)
+
+- Basic HTTP request methods and how to use FastAPI (`uvicorn` being the web server)
+- We'll create and enhance a list of books, and them books will have simple key-value pairs
+- We'll use **CRUD Operations**: Create, Read, Update and Delete
+
+```py
+BOOKS = [
+  {'title':'Title One','author':'Author One','category':'science'},
+  {'title':'Title Two','author':'Author Two','category':'science'},
+  {'title':'Title Three','author':'Author Three','category':'history'},
+  {'title':'Title Four','author':'Author Four','category':'math'},
+  {'title':'Title Five','author':'Author Five','category':'math'},
+]
+```
+
+- **Request and Response**: (CRUD) HTTP methods entre la web page y el FastAPI server
+- **[Swagger UI](https://swagger.io/)**: built-in URL `/docs`: listar todos los Request Methods disponibles
+
+| CRUD    | HTTP Requests
+| ---     | ---
+| Create  | POST
+| Read    | GET
+| Update  | PUT
+| Delete  | DELETE
+
+### 2. GET Request 1/2
+
+> OJO:
+> - `@app`: *decorator* que ~~en este caso~~ define el endpoint `/api-endpoint` en la URL http://127.0.0.1:8000/api-endpoint tras el comando `uvicorn foo`
+> - `async`: optional, explicit for every function-endpoint
+
+```py
+# books.py
+
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/api-endpoint")
+# GET Request
+async def first_api():
+    return {'message':'Sup Dawg!'}
+```
+
+Run FastAPI application (en `.venv`)
+
+```bash
+# source .venv/bin/activate
+
+uvicorn --version
+  # Running uvicorn 0.32.0 with CPython 3.10.12 on Linux
+
+cd ./01-books-requests
+
+uvicorn books:app --reload || \
+fastapi dev books.py || \
+fastapi run books.py
+
+curl localhost:8000/ &&
+curl localhost:8000/api-endpoint
+  # {"detail":"Not Found"}%
+  # {"message":"Sup Dawg!"}%
+
+xdg-open http://localhost:8000/api-endpoint
+
+# deactivate
+```
+
+- fastapi `run` vs `dev`:
+  - `run`: no live reloading by default
+  - `dev`: live reloading, includes `uvicorn` dev features, enhanced error messages, logging, etc.
+
+### 3. GET Request 2/2
+
+```py
+# books.py
+from fastapi import FastAPI
+
+app = FastAPI()
+
+BOOKS = [
+  {'title':'Title One','author':'Author One','category':'science'},
+  {'title':'Title Two','author':'Author Two','category':'science'},
+  {'title':'Title Three','author':'Author Three','category':'history'},
+  {'title':'Title Four','author':'Author Four','category':'math'},
+  {'title':'Title Five','author':'Author Five','category':'math'},
+  {'title':'Title Six','author':'Author Two','category':'math'},
+]
+
+@app.get("/books")
+async def read_all_books():
+    return BOOKS
+```
+
+```bash
+# curl -X 'GET' \
+#   'http://localhost:8000/books' \
+#   -H 'accept: application/json'
+
+curl localhost:8000/books || \
+curl -s localhost:8000/books | jq
+
+# Swagger's */docs
+xdg-open http://localhost:8000/docs#/default/read_all_books_books_get
+  # Try it out > Execute: lo mismo que con curl + jq, pero además headers y curl explícito, ta bien
+```
+
+### 4. Path Parameters
+
+> - NOTE: `%20` == space!!
+> - Example: `@app.get("/user/{user_id}")`
+
+- Request parameters attached to the URL, a way to find info based on location
+- Rutas estáticas o dinámicas mediante parámetros...
+- El orden importa, ya que si la función dinámica estuviese primero se aplicaría siempre siempre
+
+```bash
+# books.py
+
+@app.get("/books/mybook")
+async def read_all_books():
+    return {'book_title':'My Favorite Book!'}
+
+# @app.get("/books/{dynamic_param}")
+# async def read_all_books(dynamic_param:str):
+#     return {'dynamic_param':dynamic_param}
+
+@app.get("/books/{book_title}")
+async def read_book(book_title:str):
+    for book in BOOKS:
+        if book.get('title').casefold()==book_title.casefold():
+            return book
+```
+```bash
+curl localhost:8000/books/mybook && \
+curl localhost:8000/books/title%20one
+  # {"book_title":"My Favorite Book!"}
+  # {"title":"Title One","author":"Author One","category":"science"}%                             [10ms][devel][~/repos/FastAPI-The-Complete-Course]$
+
+# curl localhost:8000/books/science
+#   # {"dynamic_param":"science"}%
+```
+
+### 5. Query Parameters
+
+- Request parameters (key-value pairs) attached after a `?`
+- Example: `localhost:8000/books/?category=science`
+
+```py
+@app.get("/books/")
+async def read_category_by_query(category:str):
+    books_to_return = []
+    for book in BOOKS:
+        if book.get('category').casefold()==category.casefold():
+            books_to_return.append(book)
+    return books_to_return
+
+@app.get("/books/{book_author}/")
+async def read_author_category_by_query(book_author:str,category:str):
+    books_to_return = []
+    for book in BOOKS:
+        if book.get('author').casefold()==book_author.casefold() and \
+                book.get('category').casefold()==category.casefold():
+            books_to_return.append(book)
+    return books_to_return
+```
+```bash
+curl "localhost:8000/books/?category=science"
+  # [{"title":"Title One","author":"Author One","category":"science"},{"title":"Title Two","author":"Author Two","category":"science"}]%
+
+curl "localhost:8000/books/author%20two/?category=science"
+  # [{"title":"Title Two","author":"Author Two","category":"science"}]%
+```
+
+### 6. POST Request
+
+> [!TIP]
+> In the Request Body, only **double quotes** are valid, not single quotes
+
+- Creates data; includes additional information: a Body ~~that GET can't have~~
+- Example: pass `{'title':'Title Seven','author':'Author Two','category':'math'}`
+
+```py
+from fastapi import Body, FastAPI
+
+@app.post("/books/create_book")
+async def create_book(new_book=Body()):
+    BOOKS.append(new_book)
+```
+```bash
+curl -X 'POST' 'http://localhost:8000/books/create_book' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Title Seven","author":"Author Two","category":"math"}'
+  # null%
+
+curl localhost:8000/books/title%20seven
+  # {"title":"Title Seven","author":"Author Two","category":"math"}%
+```
+
+### 7. PUT Request
+
+- Updates data; also has additional info
+- For example, change the category of a book
+
+```py
+@app.put("/books/update_book")
+async def update_book(updated_book=Body()):
+    for i in range(len(BOOKS)):
+        if BOOKS[i].get('title').casefold()==updated_book.get('title').casefold():
+            BOOKS[i]=updated_book
+```
+```bash
+curl localhost:8000/books/title%20six
+  # {"title":"Title Six","author":"Author Two","category":"math"}%
+
+curl -X 'PUT' \
+  'http://localhost:8000/books/update_book' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Title Six","author":"Author Two","category":"history"}'
+  # null%
+
+curl localhost:8000/books/title%20six
+  # {"title":"Title Six","author":"Author Two","category":"history"}%                                                        [11ms][devel][~/repos/FastAPI-The-Complete-Course]$
+```
+
+### 8. DELETE Request
+
+```py
+@app.delete("/books/delete_book/{book_title}")
+async def delete_book(book_title:str):
+    for i in range(len(BOOKS)):
+        if BOOKS[i].get('title').casefold()==book_title.casefold():
+            BOOKS.pop(i)
+            break
+```
+```bash
+curl -s localhost:8000/books | jq '. | length'
+  # 6
+
+curl -X 'DELETE' \
+  'http://localhost:8000/books/delete_book/title%20four' \
+  -H 'accept: application/json'
+  # null%
+
+curl -s localhost:8000/books | jq '. | length'
+  # 5
+```
+
+### 9. *Assignment*
+
+> [!TIP]
+> Keep smaller endpoints (fewer params) above, to prevent it from being consumed by a longer endpoint
+
+```py
+'''
+Create a new API Endpoint that can fetch all books from a specific author
+using either Path Parameters or Query Parameters.
+'''
+
+@app.get("/books/byauthor/{author}")
+async def read_books_by_author_path(author:str):
+    books_to_return = []
+    for book in BOOKS:
+        if book.get('author').casefold()==author.casefold():
+            books_to_return.append(book)
+    return books_to_return
+
+@app.get("/books/byauthor/")
+async def read_books_by_author_query(author:str):
+    books_to_return = []
+    for book in BOOKS:
+        if book.get('author').casefold()==author.casefold():
+            books_to_return.append(book)
+    return books_to_return
+```
+```bash
+curl localhost:8000/books/byauthor/author%20two
+  # [{"title":"Title One","author":"Author One","category":"science"}]%                                                      [12ms][devel][~/repos/FastAPI-The-Complete-Course]$
+
+curl localhost:8000/books/byauthor/\?author=author%20one
+  # [{"title":"Title One","author":"Author One","category":"science"}]%                                                      [13ms][devel][~/repos/FastAPI-The-Complete-Course]$
+```
+
+
+</details>
+
+
 ## 6. Project 2 - Move Fast with FastAPI
 ## 7. Project 3 - Complete RESTful APIs
 ## 8. Setup Database

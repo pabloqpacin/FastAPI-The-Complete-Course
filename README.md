@@ -19,3 +19,16 @@
 2. In terminal type `pip install -r requirements.txt`
 3. This will download all dependencies to your machine!
 
+---
+
+ojo, parece que lo de *Note* *Important* *Caution* etc. no funciona dentro de `<details></details>`
+
+<details>
+
+
+> [!CAUTION]
+> Prueba
+
+
+</details>
+
