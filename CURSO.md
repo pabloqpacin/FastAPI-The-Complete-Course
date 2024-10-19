@@ -30,6 +30,15 @@
   - [3. FastAPI Overview](#3-fastapi-overview)
   - [4. FastAPI Setup \& Installation (`pip` \& `venv`)](#4-fastapi-setup--installation-pip--venv)
   - [5. Project 1 - FastAPI Request Method Logic](#5-project-1---fastapi-request-method-logic)
+    - [1. Intro](#1-intro)
+    - [2. GET Request 1/2](#2-get-request-12)
+    - [3. GET Request 2/2](#3-get-request-22)
+    - [4. Path Parameters](#4-path-parameters)
+    - [5. Query Parameters](#5-query-parameters)
+    - [6. POST Request](#6-post-request)
+    - [7. PUT Request](#7-put-request)
+    - [8. DELETE Request](#8-delete-request)
+    - [9. *Assignment*](#9-assignment)
   - [6. Project 2 - Move Fast with FastAPI](#6-project-2---move-fast-with-fastapi)
   - [7. Project 3 - Complete RESTful APIs](#7-project-3---complete-restful-apis)
   - [8. Setup Database](#8-setup-database)
@@ -51,7 +60,7 @@
 
 ## 2. Python Installation & Refresher
 
-<details>
+<!-- <details> -->
 
 #### 1. Intro: Python Installation (Linux) + IDE
 
@@ -1278,7 +1287,10 @@ vehicle.engine.startEngine()
 
 </details>
 
-</details>
+<!-- </details> -->
+
+---
+
 
 ## 3. FastAPI Overview
 
@@ -1286,7 +1298,7 @@ vehicle.engine.startEngine()
 > Ver diapositivas (21-...) en [./docs/FastAPI_slides.pdf](/docs/FastAPI_slides.pdf)
 
 - **[FastAPI](https://fastapi.tiangolo.com/)**: web-framework for building modern RESTful APIs
-- **Características**: fast performance and fast development: few bugs, quick & easy, robust, standards ([OpenAPI](https://www.openapis.org/) ([alt](https://swagger.io/specification/)) & [JsonSchema](https://json-schema.org/))
+- **Características**: fast performance and fast development: few bugs, quick & easy, robust, standards ([OpenAPI](https://www.openapis.org/) ([Swagger](https://swagger.io/specification/)) & [JsonSchema](https://json-schema.org/))
 - **Roles**: 
   - **FastAPI** handles all business logic for the application. Nowadays any webpage communicates with a server application through RESTful APIs, requesting data from the backend server (business logic). So **FastAPI** ensures the webpage is getting correct and secure data for the users to interact with.
   - **FastAPI** can also leverage additional tools to create full stack applications, where FastAPI also renders the front web page
@@ -1458,11 +1470,302 @@ pip list
 
 ## 5. Project 1 - FastAPI Request Method Logic
 
+
+> [!TIP]
+> Para consultar los endpoints en el navegador web (al margen de Swagger en `docs/`), usar Firefox o alguna extensión para chrome-based browsers. <br>
+> Otras opciones son usar `curl` + `jq` en la terminal <!--(ver [.utils/workstation.sh](#))--> o la aplicación de escritorio `postman` ~~(instalación de postman!!)~~
+
+
+
 <details>
+
+### 1. Intro
 
 > Diapositivas (26-...)
 
+- Basic HTTP request methods and how to use FastAPI (`uvicorn` being the web server)
+- We'll create and enhance a list of books, and them books will have simple key-value pairs
+- We'll use **CRUD Operations**: Create, Read, Update and Delete
 
+```py
+BOOKS = [
+  {'title':'Title One','author':'Author One','category':'science'},
+  {'title':'Title Two','author':'Author Two','category':'science'},
+  {'title':'Title Three','author':'Author Three','category':'history'},
+  {'title':'Title Four','author':'Author Four','category':'math'},
+  {'title':'Title Five','author':'Author Five','category':'math'},
+]
+```
+
+- **Request and Response**: (CRUD) HTTP methods entre la web page y el FastAPI server
+- **[Swagger UI](https://swagger.io/)**: built-in URL `/docs`: listar todos los Request Methods disponibles
+
+| CRUD    | HTTP Requests
+| ---     | ---
+| Create  | POST
+| Read    | GET
+| Update  | PUT
+| Delete  | DELETE
+
+### 2. GET Request 1/2
+
+> OJO:
+> - `@app`: *decorator* que ~~en este caso~~ define el endpoint `/api-endpoint` en la URL http://127.0.0.1:8000/api-endpoint tras el comando `uvicorn foo`
+> - `async`: optional, explicit for every function-endpoint
+
+```py
+# books.py
+
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/api-endpoint")
+# GET Request
+async def first_api():
+    return {'message':'Sup Dawg!'}
+```
+
+Run FastAPI application (en `.venv`)
+
+```bash
+# source .venv/bin/activate
+
+uvicorn --version
+  # Running uvicorn 0.32.0 with CPython 3.10.12 on Linux
+
+cd ./01-books-requests
+
+uvicorn books:app --reload || \
+fastapi dev books.py || \
+fastapi run books.py
+
+curl localhost:8000/ &&
+curl localhost:8000/api-endpoint
+  # {"detail":"Not Found"}%
+  # {"message":"Sup Dawg!"}%
+
+xdg-open http://localhost:8000/api-endpoint
+
+# deactivate
+```
+
+- fastapi `run` vs `dev`:
+  - `run`: no live reloading by default
+  - `dev`: live reloading, includes `uvicorn` dev features, enhanced error messages, logging, etc.
+
+### 3. GET Request 2/2
+
+```py
+# books.py
+from fastapi import FastAPI
+
+app = FastAPI()
+
+BOOKS = [
+  {'title':'Title One','author':'Author One','category':'science'},
+  {'title':'Title Two','author':'Author Two','category':'science'},
+  {'title':'Title Three','author':'Author Three','category':'history'},
+  {'title':'Title Four','author':'Author Four','category':'math'},
+  {'title':'Title Five','author':'Author Five','category':'math'},
+  {'title':'Title Six','author':'Author Two','category':'math'},
+]
+
+@app.get("/books")
+async def read_all_books():
+    return BOOKS
+```
+
+```bash
+# curl -X 'GET' \
+#   'http://localhost:8000/books' \
+#   -H 'accept: application/json'
+
+curl localhost:8000/books || \
+curl -s localhost:8000/books | jq
+
+# Swagger's */docs
+xdg-open http://localhost:8000/docs#/default/read_all_books_books_get
+  # Try it out > Execute: lo mismo que con curl + jq, pero además headers y curl explícito, ta bien
+```
+
+### 4. Path Parameters
+
+> - NOTE: `%20` == space!!
+> - Example: `@app.get("/user/{user_id}")`
+
+- Request parameters attached to the URL, a way to find info based on location
+- Rutas estáticas o dinámicas mediante parámetros...
+- El orden importa, ya que si la función dinámica estuviese primero se aplicaría siempre siempre
+
+```bash
+# books.py
+
+@app.get("/books/mybook")
+async def read_all_books():
+    return {'book_title':'My Favorite Book!'}
+
+# @app.get("/books/{dynamic_param}")
+# async def read_all_books(dynamic_param:str):
+#     return {'dynamic_param':dynamic_param}
+
+@app.get("/books/{book_title}")
+async def read_book(book_title:str):
+    for book in BOOKS:
+        if book.get('title').casefold()==book_title.casefold():
+            return book
+```
+```bash
+curl localhost:8000/books/mybook && \
+curl localhost:8000/books/title%20one
+  # {"book_title":"My Favorite Book!"}
+  # {"title":"Title One","author":"Author One","category":"science"}%                             [10ms][devel][~/repos/FastAPI-The-Complete-Course]$
+
+# curl localhost:8000/books/science
+#   # {"dynamic_param":"science"}%
+```
+
+### 5. Query Parameters
+
+- Request parameters (key-value pairs) attached after a `?`
+- Example: `localhost:8000/books/?category=science`
+
+```py
+@app.get("/books/")
+async def read_category_by_query(category:str):
+    books_to_return = []
+    for book in BOOKS:
+        if book.get('category').casefold()==category.casefold():
+            books_to_return.append(book)
+    return books_to_return
+
+@app.get("/books/{book_author}/")
+async def read_author_category_by_query(book_author:str,category:str):
+    books_to_return = []
+    for book in BOOKS:
+        if book.get('author').casefold()==book_author.casefold() and \
+                book.get('category').casefold()==category.casefold():
+            books_to_return.append(book)
+    return books_to_return
+```
+```bash
+curl "localhost:8000/books/?category=science"
+  # [{"title":"Title One","author":"Author One","category":"science"},{"title":"Title Two","author":"Author Two","category":"science"}]%
+
+curl "localhost:8000/books/author%20two/?category=science"
+  # [{"title":"Title Two","author":"Author Two","category":"science"}]%
+```
+
+### 6. POST Request
+
+> [!TIP]
+> In the Request Body, only **double quotes** are valid, not single quotes
+
+- Creates data; includes additional information: a Body ~~that GET can't have~~
+- Example: pass `{'title':'Title Seven','author':'Author Two','category':'math'}`
+
+```py
+from fastapi import Body, FastAPI
+
+@app.post("/books/create_book")
+async def create_book(new_book=Body()):
+    BOOKS.append(new_book)
+```
+```bash
+curl -X 'POST' 'http://localhost:8000/books/create_book' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Title Seven","author":"Author Two","category":"math"}'
+  # null%
+
+curl localhost:8000/books/title%20seven
+  # {"title":"Title Seven","author":"Author Two","category":"math"}%
+```
+
+### 7. PUT Request
+
+- Updates data; also has additional info
+- For example, change the category of a book
+
+```py
+@app.put("/books/update_book")
+async def update_book(updated_book=Body()):
+    for i in range(len(BOOKS)):
+        if BOOKS[i].get('title').casefold()==updated_book.get('title').casefold():
+            BOOKS[i]=updated_book
+```
+```bash
+curl localhost:8000/books/title%20six
+  # {"title":"Title Six","author":"Author Two","category":"math"}%
+
+curl -X 'PUT' \
+  'http://localhost:8000/books/update_book' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Title Six","author":"Author Two","category":"history"}'
+  # null%
+
+curl localhost:8000/books/title%20six
+  # {"title":"Title Six","author":"Author Two","category":"history"}%                                                        [11ms][devel][~/repos/FastAPI-The-Complete-Course]$
+```
+
+### 8. DELETE Request
+
+```py
+@app.delete("/books/delete_book/{book_title}")
+async def delete_book(book_title:str):
+    for i in range(len(BOOKS)):
+        if BOOKS[i].get('title').casefold()==book_title.casefold():
+            BOOKS.pop(i)
+            break
+```
+```bash
+curl -s localhost:8000/books | jq '. | length'
+  # 6
+
+curl -X 'DELETE' \
+  'http://localhost:8000/books/delete_book/title%20four' \
+  -H 'accept: application/json'
+  # null%
+
+curl -s localhost:8000/books | jq '. | length'
+  # 5
+```
+
+### 9. *Assignment*
+
+> [!TIP]
+> Keep smaller endpoints (fewer params) above, to prevent it from being consumed by a longer endpoint
+
+```py
+'''
+Create a new API Endpoint that can fetch all books from a specific author
+using either Path Parameters or Query Parameters.
+'''
+
+@app.get("/books/byauthor/{author}")
+async def read_books_by_author_path(author:str):
+    books_to_return = []
+    for book in BOOKS:
+        if book.get('author').casefold()==author.casefold():
+            books_to_return.append(book)
+    return books_to_return
+
+@app.get("/books/byauthor/")
+async def read_books_by_author_query(author:str):
+    books_to_return = []
+    for book in BOOKS:
+        if book.get('author').casefold()==author.casefold():
+            books_to_return.append(book)
+    return books_to_return
+```
+```bash
+curl localhost:8000/books/byauthor/author%20two
+  # [{"title":"Title One","author":"Author One","category":"science"}]%                                                      [12ms][devel][~/repos/FastAPI-The-Complete-Course]$
+
+curl localhost:8000/books/byauthor/\?author=author%20one
+  # [{"title":"Title One","author":"Author One","category":"science"}]%                                                      [13ms][devel][~/repos/FastAPI-The-Complete-Course]$
+```
 
 
 </details>
