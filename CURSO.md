@@ -40,21 +40,23 @@
     - [8. DELETE Request](#8-delete-request)
     - [9. *Assignment*](#9-assignment)
   - [6. Project 2 - Move Fast with FastAPI](#6-project-2---move-fast-with-fastapi)
-    - [1. Intro \& Project Setup (`Book` Python Object)](#1-intro--project-setup-book-python-object)
-    - [2. POST Request before Validation](#2-post-request-before-validation)
-    - [3. Book Request Data Validation (**pydantic**)](#3-book-request-data-validation-pydantic)
-    - [4. Fields - Data Validation](#4-fields---data-validation)
-    - [5. Pydantic Configurations (Swagger defaults)](#5-pydantic-configurations-swagger-defaults)
-    - [6. Fetch Book](#6-fetch-book)
-    - [7. Fetch Books by Rating](#7-fetch-books-by-rating)
-    - [8. Update Book with PUT Request](#8-update-book-with-put-request)
-    - [9. Delete Book with DELETE Request](#9-delete-book-with-delete-request)
-    - [10. Assignment](#10-assignment)
-    - [11. Data Validation Path Parameters](#11-data-validation-path-parameters)
-    - [12. Data Validation Query Parameters](#12-data-validation-query-parameters)
-    - [13. Status Codes Overview](#13-status-codes-overview)
-    - [14. HTTP Exceptions](#14-http-exceptions)
-    - [15. Explicit Status Code Responses](#15-explicit-status-code-responses)
+    - [(Swagger, Pydantic, Path \& Query Validation)](#swagger-pydantic-path--query-validation)
+      - [1. Intro \& Project Setup (`Book` Python Object)](#1-intro--project-setup-book-python-object)
+      - [2. POST Request before Validation](#2-post-request-before-validation)
+      - [3. Book Request Data Validation (**pydantic**)](#3-book-request-data-validation-pydantic)
+      - [4. Fields - Data Validation](#4-fields---data-validation)
+      - [5. Pydantic Configurations (Swagger defaults)](#5-pydantic-configurations-swagger-defaults)
+      - [6. Fetch Book](#6-fetch-book)
+      - [7. Fetch Books by Rating](#7-fetch-books-by-rating)
+      - [8. Update Book with PUT Request](#8-update-book-with-put-request)
+      - [9. Delete Book with DELETE Request](#9-delete-book-with-delete-request)
+      - [10. Assignment](#10-assignment)
+      - [11. Data Validation: Path Parameters](#11-data-validation-path-parameters)
+      - [12. Data Validation: Query Parameters](#12-data-validation-query-parameters)
+    - [(HTTP Status Codes)](#http-status-codes)
+      - [13. Status Codes Overview](#13-status-codes-overview)
+      - [14. HTTP Exceptions](#14-http-exceptions)
+      - [15. Explicit Status Code Responses](#15-explicit-status-code-responses)
   - [7. Project 3 - Complete RESTful APIs](#7-project-3---complete-restful-apis)
   - [8. Setup Database](#8-setup-database)
   - [9. API Request Methods](#9-api-request-methods)
@@ -1794,9 +1796,9 @@ curl localhost:8000/books/byauthor/\?author=author%20one
 ## 6. Project 2 - Move Fast with FastAPI
 
 > [!IMPORTANT]
-> Content: Data Validation, Exception Handling, Status COdes, Swagger Configuration, and Python Requests Objects
+> Content: Data Validation, Exception Handling, Status Codes, Swagger Configuration, and Python Requests Objects
 
-<details>
+<!-- <details> -->
 
 <!--
 ```md
@@ -1809,7 +1811,11 @@ The three biggest are:
 ```
 -->
 
-### 1. Intro & Project Setup (`Book` Python Object)
+### (Swagger, Pydantic, Path & Query Validation)
+
+<details>
+
+#### 1. Intro & Project Setup (`Book` Python Object)
 
 ```py
 from fastapi import FastAPI
@@ -1854,7 +1860,7 @@ curl -X 'GET' \
   # [{"id":1,"title":"Computer Science Pro","author":"Setenova","description":"A very nice book!","rating":5},{"id":2,"title":"Be Fast with FastAPI","author":"Setenova","description":"A great book!","rating":5},{"id":3,"title":"Master Endpoints","author":"Setenova","description":"An awesome book!","rating":5},{"id":4,"title":"HP1","author":"Author 1","description":"Book Description","rating":2},{"id":5,"title":"HP2","author":"Author 2","description":"Book Description","rating":3},{"id":6,"title":"HP3","author":"Author 3","description":"Book Description","rating":1}]%
 ```
 
-### 2. POST Request before Validation
+#### 2. POST Request before Validation
 
 Problema: se puede añadir de todo en el POST (eg. un índice o rating de 200 etc.)
 
@@ -1882,7 +1888,7 @@ curl -X 'POST' \
 ```
 
 
-### 3. Book Request Data Validation (**pydantic**)
+#### 3. Book Request Data Validation (**pydantic**)
 
 > [!TIP]
 > En Swagger, ahora habrá una plantilla (con data types etc.) en el POST!!
@@ -1912,7 +1918,7 @@ async def create_book(book_request:BookRequest):
     BOOKS.append(new_book)
 ```
 
-### 4. Fields - Data Validation
+#### 4. Fields - Data Validation
 
 - **Objetivo 1**: asegurarnos de que los datos de POST son válidos
 - Poner a prueba la POST incumpliendo las reglas de `Field()`: `422 Error: Unprocessable Entity`
@@ -1955,7 +1961,7 @@ curl -X 'GET' 'http://localhost:8000/books'
 
 ![/docs/img/02-post-schema.png](/docs/img/02-post-schema.png)
 
-### 5. Pydantic Configurations (Swagger defaults)
+#### 5. Pydantic Configurations (Swagger defaults)
 
 - Swagger > POST > Example Value
 
@@ -1979,7 +1985,7 @@ class BookRequest(BaseModel):
     }
 ```
 
-### 6. Fetch Book
+#### 6. Fetch Book
 
 - new endpoint: find books based on their ID
 
@@ -1997,7 +2003,7 @@ curl -X 'GET' \
   # {"id":5,"title":"HP2","author":"Author 2","description":"Book Description","rating":3}%
 ```
 
-### 7. Fetch Books by Rating
+#### 7. Fetch Books by Rating
 
 - new endpoint: find books querying ratings (filter by rating)
 - tener en cuenta el orden (posibles conflictos entre endpoints)
@@ -2018,7 +2024,7 @@ curl -X 'GET' \
   # [{"id":1,"title":"Computer Science Pro","author":"Setenova","description":"A very nice book!","rating":5},{"id":2,"title":"Be Fast with FastAPI","author":"Setenova","description":"A great book!","rating":5},{"id":3,"title":"Master Endpoints","author":"Setenova","description":"An awesome book!","rating":5}]%
 ```
 
-### 8. Update Book with PUT Request
+#### 8. Update Book with PUT Request
 
 - ojo: aquí el ID sería necesario
 - ojo: luego haremos Error Handling para que no se pueda actualizar un id 100 inexistente etc.
@@ -2044,7 +2050,7 @@ curl 'http://localhost:8000/books/3'
   # {"id":3,"title":"Endpoints Master","author":"Setenova","description":"An awesome book!","rating":5}%
 ```
 
-### 9. Delete Book with DELETE Request
+#### 9. Delete Book with DELETE Request
 
 ```py
 @app.delete("/books/{book_id}")
@@ -2066,7 +2072,7 @@ curl 'http://localhost:8000/books/2'
   # null%
 ```
 
-### 10. Assignment
+#### 10. Assignment
 
 ```py
 '''
@@ -2092,39 +2098,130 @@ curl -X 'GET' \
   # [{"id":6,"title":"HP3","author":"Author 3","description":"Book Description","published_date":1984,"rating":1}]%
 ```
 
-### 11. Data Validation Path Parameters
+#### 11. Data Validation: Path Parameters
+
+- atm we only have validation on the BookRequest class, but not on the endpoints (eg. a book doesn't exist, validation to the book IDs)
+- verify: search book with id 0 or delete book with id -1: `422	Error: Unprocessable Entity`
 
 ```py
-```
-```bash
+from fastapi import FastAPI, Path
+
+async def read_book_by_id(book_id:int =Path(gt=0)):
+  # ...
+
+# ...
+async def delete_book_by_id(book_id:int =Path(gt=0)):
+  # ...
 ```
 
-### 12. Data Validation Query Parameters
+#### 12. Data Validation: Query Parameters
 
-```py
-```
-```bash
-```
-
-### 13. Status Codes Overview
-
-```py
-```
-```bash
-```
-
-### 14. HTTP Exceptions
+- verificar: buscar con rating 7, o con fecha 12345
 
 ```py
-```
-```bash
+from fastapi import FastAPI, Path, Query
+
+# ...
+async def read_book_by_rating(book_rating:int =Query(gt=0,lt=6)):
+  # ...
+
+# ...
+async def read_book_by_publish_date(published_date:int =Query(lt=9999)):
+  # ...
 ```
 
-### 15. Explicit Status Code Responses
+</details>
+
+
+### (HTTP Status Codes)
+
+<details>
+
+#### 13. Status Codes Overview
+
+>[!IMPORTANT]
+> HTTP Status Codes 101
+
+<!-- >[!NOTE]
+> Diapositivas 61-... -->
+
+- international standards on how a client/server should handle the result of a request
+
+| Code  | Meaning
+| ---   | ---
+| 1xx   | Information Response: request processing
+| 2xx   | Success: request sucessfully complete
+| 3xx   | Redirection: further action must be complete
+| 4xx   | Client Errors: an error was caused by the client
+| 5xx   | Server Errors: an error occurred on the server
+
+| Code  | Meaning               | Description
+| ---   | ---                   | ---
+|       |
+| 200   | OK                    | Successful GET with data returned
+| 201   | Created               | Sucessful POST
+| 204   | No Content            | Sucessful PUT with no data returned or created
+|       |
+| 400   | Bad Request           | Invalid request methods, can't be processed bc client error
+| 401   | Unauthorized          | Client lacks valid authentication for target resource
+| 404   | Not Found             | Client's requested resource not found
+| 422   | Unprocessable Entity  | Semantic errors in client request
+|       |
+| 500   | Internal Server Error | Generic message for unexpected issues on the server
+
+
+#### 14. HTTP Exceptions
+
+- "An HTTP exception is something that we have to raise within our method, which will cancel the functionality of our method and return a message in a status code back to our user"
 
 ```py
+from fastapi import FastAPI, Path, Query, HTTPException
+
+# ...
+    raise HTTPException(status_code=404, detail='Item not found')
+
+
+# ...
+    if not book_changed:
+        raise HTTPException(status_code=404, detail='Item not found')
+
 ```
 ```bash
+curl -X 'GET' \
+  'http://localhost:8000/books/999' \
+  -H 'accept: application/json'
+  # {"detail":"Item not found"}%
+```
+
+#### 15. Explicit Status Code Responses
+
+```py
+from starlette import status
+
+@app.get("/books",status_code=status.HTTP_200_OK)
+@app.get("/books/{book_id}",status_code=status.HTTP_200_OK)
+@app.get("/books/",status_code=status.HTTP_200_OK)
+@app.get("/books/publish/",status_code=status.HTTP_200_OK)
+
+@app.post("/create-book",status_code=status.HTTP_201_CREATED)
+@app.put("/update-book",status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/books/{book_id}",status_code=status.HTTP_204_NO_CONTENT)
+```
+```bash
+curl -v -X 'DELETE' \
+  'http://localhost:8000/books/1' \
+  -H 'accept: */*'
+  # ...
+  # < HTTP/1.1 204 No Content
+
+curl -v -X 'DELETE' \
+  'http://localhost:8000/books/1' \
+  -H 'accept: */*'
+  # ...
+  # < HTTP/1.1 404 Not Found
+
+# ... -X 'POST' ...
+# ... -X 'PUT' ...
 ```
 
 
