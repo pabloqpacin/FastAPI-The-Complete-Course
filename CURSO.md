@@ -44,7 +44,7 @@
     - [2. POST Request before Validation](#2-post-request-before-validation)
     - [3. Book Request Data Validation (**pydantic**)](#3-book-request-data-validation-pydantic)
     - [4. Fields - Data Validation](#4-fields---data-validation)
-    - [5. Pydantic Configurations](#5-pydantic-configurations)
+    - [5. Pydantic Configurations (Swagger defaults)](#5-pydantic-configurations-swagger-defaults)
     - [6. Fetch Book](#6-fetch-book)
     - [7. Fetch Books by Rating](#7-fetch-books-by-rating)
     - [8. Update Book with PUT Request](#8-update-book-with-put-request)
@@ -1789,6 +1789,7 @@ curl localhost:8000/books/byauthor/\?author=author%20one
 
 </details>
 
+---
 
 ## 6. Project 2 - Move Fast with FastAPI
 
@@ -1913,72 +1914,183 @@ async def create_book(book_request:BookRequest):
 
 ### 4. Fields - Data Validation
 
+- **Objetivo 1**: asegurarnos de que los datos de POST son válidos
 - Poner a prueba la POST incumpliendo las reglas de `Field()`: `422 Error: Unprocessable Entity`
+- **Objetivo 2**: automatizar índices incrementales
 
 ```py
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
+from typing import Optional
 
 class BookRequest(BaseModel):
-    id:int
+    id:Optional[int] =None
     title:str =Field(min_length=3)
     author:str =Field(min_length=1)
     description:str =Field(min_length=3,max_length=100)
     rating:int =Field(gt=0,lt=6)
+
+# @app.post("/create-book")
+def find_book_id(book:Book):
+    # if len(BOOKS)>0:
+    #     book.id=BOOKS[-1].id+1
+    # else:
+    #     book.id=1
+    book.id=1 if len(BOOKS)==0 else BOOKS[-1].id+1
+    return book
 ```
 ```bash
-```
+curl -X 'GET' 'http://localhost:8000/books'
+# [{"id":1,"title":"Computer Science Pro","author":"Setenova","description":"A very nice book!","rating":5},[...],{"id":6,"title":"HP3","author":"Author 3","description":"Book Description","rating":1}%
 
+curl -X 'POST' \
+  'http://localhost:8000/create-book' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"string","author":"string","description":"string","rating": 1}'
+
+curl -X 'GET' 'http://localhost:8000/books'
+# [{"id":1,"title":"Computer Science Pro","author":"Setenova","description":"A very nice book!","rating":5},[...],{"id":7,"title":"string","author":"string","description":"string","rating":1}]%
+```
 
 ![/docs/img/02-post-schema.png](/docs/img/02-post-schema.png)
 
-### 5. Pydantic Configurations
+### 5. Pydantic Configurations (Swagger defaults)
+
+- Swagger > POST > Example Value
 
 ```py
-```
-```bash
-```
+class BookRequest(BaseModel):
+    id:Optional[int] =Field(description='ID is not needed on POST',default=None)
+    title:str =Field(min_length=3)
+    author:str =Field(min_length=1)
+    description:str =Field(min_length=3,max_length=100)
+    rating:int =Field(gt=0,lt=6)
 
+    model_config={
+        "json_schema_extra":{
+            "example":{
+                "title":"A new book",
+                "author":"pabloqpacin",
+                "description":"A new description of a book",
+                "rating":5
+            }
+        }
+    }
+```
 
 ### 6. Fetch Book
 
+- new endpoint: find books based on their ID
+
 ```py
+@app.get("/books/{book_id}")
+async def read_book_by_id(book_id:int):
+    for book in BOOKS:
+        if book.id==book_id:
+            return book
 ```
 ```bash
+curl -X 'GET' \
+  'http://localhost:8000/books/5' \
+  -H 'accept: application/json'
+  # {"id":5,"title":"HP2","author":"Author 2","description":"Book Description","rating":3}%
 ```
-
 
 ### 7. Fetch Books by Rating
 
+- new endpoint: find books querying ratings (filter by rating)
+- tener en cuenta el orden (posibles conflictos entre endpoints)
+
 ```py
+@app.get("/books/")
+async def read_book_by_rating(book_rating:int):
+    books_to_return=[]
+    for book in BOOKS:
+        if book.rating==book_rating:
+            books_to_return.append(book)
+    return books_to_return
 ```
 ```bash
+curl -X 'GET' \
+  'http://localhost:8000/books/?book_rating=5' \
+  -H 'accept: application/json'
+  # [{"id":1,"title":"Computer Science Pro","author":"Setenova","description":"A very nice book!","rating":5},{"id":2,"title":"Be Fast with FastAPI","author":"Setenova","description":"A great book!","rating":5},{"id":3,"title":"Master Endpoints","author":"Setenova","description":"An awesome book!","rating":5}]%
 ```
-
 
 ### 8. Update Book with PUT Request
 
+- ojo: aquí el ID sería necesario
+- ojo: luego haremos Error Handling para que no se pueda actualizar un id 100 inexistente etc.
+
 ```py
+@app.put("/update-book")
+async def update_book_by_id(book:BookRequest):
+    for i in range(len(BOOKS)):
+        if BOOKS[i].id==book.id:
+            BOOKS[i]=book
 ```
 ```bash
-```
+curl 'http://localhost:8000/books/3'
+  # {"id":3,"title":"Master Endpoints","author":"Setenova","description":"An awesome book!","rating":5}%
 
+curl -X 'PUT' \
+  'http://localhost:8000/update-book' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{"id":3,"title":"Endpoints Master","author":"Setenova","description":"An awesome book!","rating":5}'
+
+curl 'http://localhost:8000/books/3'
+  # {"id":3,"title":"Endpoints Master","author":"Setenova","description":"An awesome book!","rating":5}%
+```
 
 ### 9. Delete Book with DELETE Request
 
 ```py
+@app.delete("/books/{book_id}")
+async def delete_book_by_id(book_id:int):
+    for i in range(len(BOOKS)):
+        if BOOKS[i].id==book_id:
+            BOOKS.pop(i)
+            break
 ```
 ```bash
-```
+curl 'http://localhost:8000/books/2'
+  # {"id":2,"title":"Be Fast with FastAPI","author":"Setenova","description":"A great book!","rating":5}%
 
+curl -X 'DELETE' \
+  'http://localhost:8000/books/2' \
+  -H 'accept: application/json'
+
+curl 'http://localhost:8000/books/2'
+  # null%
+```
 
 ### 10. Assignment
 
 ```py
+'''
+- Add a new field to Book and BookRequest called published_date: int (for example, published_date: int = 2012). So, this book as published on the year of 2012.
+- Enhance each Book to now have a published_date
+- Then create a new GET Request method to filter by published_date
+'''
+
+# ...
+
+@app.get("/books/publish/")
+async def read_book_by_publish_date(published_date:int):
+    books_to_return=[]
+    for book in BOOKS:
+        if book.published_date==published_date:
+            books_to_return.append(book)
+    return books_to_return
 ```
 ```bash
+curl -X 'GET' \
+  'http://localhost:8000/books/publish/?published_date=1984' \
+  -H 'accept: application/json'
+  # [{"id":6,"title":"HP3","author":"Author 3","description":"Book Description","published_date":1984,"rating":1}]%
 ```
-
 
 ### 11. Data Validation Path Parameters
 
@@ -1987,14 +2099,12 @@ class BookRequest(BaseModel):
 ```bash
 ```
 
-
 ### 12. Data Validation Query Parameters
 
 ```py
 ```
 ```bash
 ```
-
 
 ### 13. Status Codes Overview
 
@@ -2003,7 +2113,6 @@ class BookRequest(BaseModel):
 ```bash
 ```
 
-
 ### 14. HTTP Exceptions
 
 ```py
@@ -2011,16 +2120,12 @@ class BookRequest(BaseModel):
 ```bash
 ```
 
-
 ### 15. Explicit Status Code Responses
 
 ```py
 ```
 ```bash
 ```
-
-
-
 
 
 </details>
