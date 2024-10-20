@@ -40,6 +40,21 @@
     - [8. DELETE Request](#8-delete-request)
     - [9. *Assignment*](#9-assignment)
   - [6. Project 2 - Move Fast with FastAPI](#6-project-2---move-fast-with-fastapi)
+    - [1. Intro \& Project Setup (`Book` Python Object)](#1-intro--project-setup-book-python-object)
+    - [2. POST Request before Validation](#2-post-request-before-validation)
+    - [3. Book Request Data Validation (**pydantic**)](#3-book-request-data-validation-pydantic)
+    - [4. Fields - Data Validation](#4-fields---data-validation)
+    - [5. Pydantic Configurations](#5-pydantic-configurations)
+    - [6. Fetch Book](#6-fetch-book)
+    - [7. Fetch Books by Rating](#7-fetch-books-by-rating)
+    - [8. Update Book with PUT Request](#8-update-book-with-put-request)
+    - [9. Delete Book with DELETE Request](#9-delete-book-with-delete-request)
+    - [10. Assignment](#10-assignment)
+    - [11. Data Validation Path Parameters](#11-data-validation-path-parameters)
+    - [12. Data Validation Query Parameters](#12-data-validation-query-parameters)
+    - [13. Status Codes Overview](#13-status-codes-overview)
+    - [14. HTTP Exceptions](#14-http-exceptions)
+    - [15. Explicit Status Code Responses](#15-explicit-status-code-responses)
   - [7. Project 3 - Complete RESTful APIs](#7-project-3---complete-restful-apis)
   - [8. Setup Database](#8-setup-database)
   - [9. API Request Methods](#9-api-request-methods)
@@ -1467,15 +1482,19 @@ pip list
 ```
  -->
 
+---
 
 ## 5. Project 1 - FastAPI Request Method Logic
 
+> [!TIP]
+> Usar Swagger (en `docs/`) para probar las Requests y los Endpoints. También se puede usar `curl`+`jq` en la terminal, o la aplicación de escritorio [Postman](https://learning.postman.com/docs/getting-started/first-steps/get-postman/) <!--Para consultar los endpoints tal cual con el navegador, usar Firefox o para Chrome-based browsers instalar alguna extensión para visualizar JSON...-->
 
+
+<!-- 
 > [!TIP]
 > Para consultar los endpoints en el navegador web (al margen de Swagger en `docs/`), usar Firefox o alguna extensión para chrome-based browsers. <br>
-> Otras opciones son usar `curl` + `jq` en la terminal <!--(ver [.utils/workstation.sh](#))--> o la aplicación de escritorio `postman` ~~(instalación de postman!!)~~
-
-
+> Otras opciones son usar `curl` + `jq` en la terminal ~~(ver [.utils/workstation.sh](#))~~ o la aplicación de escritorio `postman` ~~(instalación de postman!!)~~
+ -->
 
 <details>
 
@@ -1772,6 +1791,241 @@ curl localhost:8000/books/byauthor/\?author=author%20one
 
 
 ## 6. Project 2 - Move Fast with FastAPI
+
+> [!IMPORTANT]
+> Content: Data Validation, Exception Handling, Status COdes, Swagger Configuration, and Python Requests Objects
+
+<details>
+
+<!--
+```md
+FastAPI is now compatible with both Pydantic v1 and Pydantic v2.
+Based on how new the version of FastAPI you are using, there could be small method name changes.
+The three biggest are:
+- `.dict()` function is now renamed to `.model_dump()`
+- `schema_extra` function within a Config class is now renamed to `json_schema_extra`
+- Optional variables need a `=None`; example: `id: Optional[int] = None`
+```
+-->
+
+### 1. Intro & Project Setup (`Book` Python Object)
+
+```py
+from fastapi import FastAPI
+
+app = FastAPI()
+
+# ---
+
+class Book:
+    id:int
+    title:str
+    author:str
+    description:str
+    rating:int
+
+    def __init__(self,id,title,author,description,rating):
+        self.id=id
+        self.title=title
+        self.author=author
+        self.description=description
+        self.rating=rating
+
+BOOKS=[
+    Book(1,'Computer Science Pro','Setenova','A very nice book!',5),
+    Book(2,'Be Fast with FastAPI','Setenova','A great book!',5),
+    Book(3,'Master Endpoints','Setenova','An awesome book!',5),
+    Book(4,'HP1','Author 1','Book Description',2),
+    Book(5,'HP2','Author 2','Book Description',3),
+    Book(6,'HP3','Author 3','Book Description',1)
+]
+
+# ---
+
+@app.get("/books")
+async def read_all_books():
+    return BOOKS
+```
+```bash
+curl -X 'GET' \
+  'http://localhost:8000/books' \
+  -H 'accept: application/json'
+  # [{"id":1,"title":"Computer Science Pro","author":"Setenova","description":"A very nice book!","rating":5},{"id":2,"title":"Be Fast with FastAPI","author":"Setenova","description":"A great book!","rating":5},{"id":3,"title":"Master Endpoints","author":"Setenova","description":"An awesome book!","rating":5},{"id":4,"title":"HP1","author":"Author 1","description":"Book Description","rating":2},{"id":5,"title":"HP2","author":"Author 2","description":"Book Description","rating":3},{"id":6,"title":"HP3","author":"Author 3","description":"Book Description","rating":1}]%
+```
+
+### 2. POST Request before Validation
+
+Problema: se puede añadir de todo en el POST (eg. un índice o rating de 200 etc.)
+
+```py
+from fastapi import Body, FastAPI
+
+# ---
+
+@app.post("/books/create-book")
+async def create_book(book_request=Body()):
+    BOOKS.append(book_request)
+```
+```bash
+curl -X 'POST' \
+  'http://localhost:8000/books/create-book' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '  {
+    "id": 7,
+    "title": "HP4",
+    "author": "Author 3",
+    "description": "Book Description",
+    "rating": 1
+  }'
+```
+
+
+### 3. Book Request Data Validation (**pydantic**)
+
+> [!TIP]
+> En Swagger, ahora habrá una plantilla (con data types etc.) en el POST!!
+
+- **[pydantics](https://docs.pydantic.dev/latest/)**: data library for data modelling, data parsing and has efficient error handling
+- Procedimiento:
+  - create different request model for data validation
+  - field data validation on each variable/element
+  - we'll convert the Pydantics Request into a Book object
+
+> NOTE: `**` operator: will pass the key/value from BookRequest() into the Book() constructor
+
+```py
+from fastapi import FastAPI # ,Body
+from pydantic import BaseModel
+
+class BookRequest(BaseModel):
+    id:int
+    title:str       #=Field(min_length=3)
+    author:str      #=Field(min_length=1)
+    description:str #=Field(min_length=3,max_length=100)
+    rating:int      #=Field(gt=0,lt=5)
+
+@app.post("/create-book")
+async def create_book(book_request:BookRequest):
+    new_book = Book(**book_request.model_dump())
+    BOOKS.append(new_book)
+```
+
+### 4. Fields - Data Validation
+
+- Poner a prueba la POST incumpliendo las reglas de `Field()`: `422 Error: Unprocessable Entity`
+
+```py
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+class BookRequest(BaseModel):
+    id:int
+    title:str =Field(min_length=3)
+    author:str =Field(min_length=1)
+    description:str =Field(min_length=3,max_length=100)
+    rating:int =Field(gt=0,lt=6)
+```
+```bash
+```
+
+
+![/docs/img/02-post-schema.png](/docs/img/02-post-schema.png)
+
+### 5. Pydantic Configurations
+
+```py
+```
+```bash
+```
+
+
+### 6. Fetch Book
+
+```py
+```
+```bash
+```
+
+
+### 7. Fetch Books by Rating
+
+```py
+```
+```bash
+```
+
+
+### 8. Update Book with PUT Request
+
+```py
+```
+```bash
+```
+
+
+### 9. Delete Book with DELETE Request
+
+```py
+```
+```bash
+```
+
+
+### 10. Assignment
+
+```py
+```
+```bash
+```
+
+
+### 11. Data Validation Path Parameters
+
+```py
+```
+```bash
+```
+
+
+### 12. Data Validation Query Parameters
+
+```py
+```
+```bash
+```
+
+
+### 13. Status Codes Overview
+
+```py
+```
+```bash
+```
+
+
+### 14. HTTP Exceptions
+
+```py
+```
+```bash
+```
+
+
+### 15. Explicit Status Code Responses
+
+```py
+```
+```bash
+```
+
+
+
+
+
+</details>
+
+
 ## 7. Project 3 - Complete RESTful APIs
 ## 8. Setup Database
 ## 9. API Request Methods
