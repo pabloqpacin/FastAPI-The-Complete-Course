@@ -58,7 +58,13 @@
       - [14. HTTP Exceptions](#14-http-exceptions)
       - [15. Explicit Status Code Responses](#15-explicit-status-code-responses)
   - [7. Project 3 - Complete RESTful APIs](#7-project-3---complete-restful-apis)
-  - [8. Setup Database](#8-setup-database)
+  - [8. Setup Database ](#8-setup-database-)
+      - [2. DB Connection with ORM SQLAlchemy](#2-db-connection-with-orm-sqlalchemy)
+      - [3. DB Tables (Models)](#3-db-tables-models)
+      - [4. main: DB Conn. for API \& init](#4-main-db-conn-for-api--init)
+      - [5. SQLite3 Installation](#5-sqlite3-installation)
+      - [6. SQL Queries](#6-sql-queries)
+      - [7. SQLite3 Setup: TODOs](#7-sqlite3-setup-todos)
   - [9. API Request Methods](#9-api-request-methods)
   - [10. Authentication \& Authorization (JWT)](#10-authentication--authorization-jwt)
   - [11. Authenticate Requests](#11-authenticate-requests)
@@ -1557,7 +1563,7 @@ uvicorn --version
 
 cd ./01-books-requests
 
-uvicorn books:app --reload || \
+# uvicorn books:app --reload || \
 fastapi dev books.py || \
 fastapi run books.py
 
@@ -2229,7 +2235,137 @@ curl -v -X 'DELETE' \
 
 
 ## 7. Project 3 - Complete RESTful APIs
-## 8. Setup Database
+
+- Content 1/2:
+  - full SQL Database: SQLite, PostreSQL & MySQL (WIP: Dockerized!!!!)
+  - Authentication: create usernames+passwords (JWT)
+  - Authorization: roles/permissions for endpoints
+  - Hashing Passwords
+- Content 2/2:
+  - TODOS instead of BOOKS
+  - create new TODO Table Model for the application
+  - using TODOs to save records throughout the project
+
+```mermaid
+flowchart LR;
+
+Webpage -. auth .-> FastAPI
+FastAPI -. fetch users & save TODOs .-> Database
+```
+
+---
+
+## 8. Setup Database <!--(*Dockerized* PostgreSQL)-->
+
+<details>
+
+<!-- 
+#### 1. Intro
+
+- **Database**: easily accessible, modifiable, controlled and organized; atm we use SQL
+- **Data**: info related to objects (eg. user: name,age,email,password)
+- **Database Management Systems (DBMS)**: SQLite, MySQL, PostreSQL
+- **SQL**: relational DBs with tables etc.
+- ~~**Usecase**: store, retrieve and modify data~~
+ -->
+
+#### 2. DB Connection with ORM SQLAlchemy
+
+> [!IMPORTANT]
+> Install SQLAlchemy with `.venv` activated!
+
+- Instalar [SQLAlchemy](https://www.sqlalchemy.org/)
+
+```bash
+# source .venv/bin/activate
+
+pip install sqlalchemy
+  # ...
+  # Successfully installed greenlet-3.1.1 sqlalchemy-2.0.36
+```
+
+- Crear [./database.py](/03-todos-database/database.py)
+<!-- # Create a session local ~~(will be object)~~, and each instance will have its own session -->
+
+```py
+# database.py
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+
+SQLALCHEMY_DATABASE_URL='sqlite:///./todos.db'
+
+# SQLite only allows one thread per request by default to prevent accidents sharing a connection with multiple requests, but it's common to have many threads interacting with the DB... therefore we have SQLite not check the same thread because there could be many
+engine = create_engine(SQLALCHEMY_DATABASE_URL,connect_args={'check_same_thread':False})
+
+SessionLocal = sessionmaker(autocommit=False,autoflush=False,bind=engine)
+
+Base = declarative_base()
+```
+
+#### 3. DB Tables (Models)
+
+- TODO Tables Example (**modelado de datos**)
+
+| ID (PK) | title               | description | priority  | complete
+| ---     | ---                 | ---         | ---       | ---
+| 1       | Go to store         | foo         | 4         | 0
+| 2       | Haircut             | foo         | 3         | 0
+| 3       | Feed dog            | foo         | 5         | 0
+| 4       | Water plant         | foo         | 4         | 0
+| 5       | Learn something new | foo         | 5         | 0
+
+
+- Create [.models.py](/03-todos-database/models.py)
+
+```py
+# models.py
+
+from database import Base
+from sqlalchemy import Column,Integer,String,Boolean
+
+# Table
+class Todos(Base):
+    __tablename__='todos'
+    
+    id=Column(Integer,primary_key=True,index=True)
+    title=Column(String)
+    description=Column(String)
+    priority=Column(Integer)
+    complete=Column(Boolean,default=False)
+```
+
+#### 4. main: DB Conn. for API & init
+
+```py
+# main.py
+
+from fastapi import FastAPI
+from database import engine
+import models
+
+
+app = FastAPI()
+
+models.Base.metadata.create_all(bind=engine)
+```
+```bash
+# cd 03-todos-database
+
+fastapi dev main.py || \
+uvicorn main:app --reload
+
+file ./todos.db
+  # todos.db: SQLite 3.x database, last written using SQLite version 3037002, file counter 2, database pages 3, cookie 0x2, schema 4, UTF-8, version-valid-for 2
+```
+
+#### 5. SQLite3 Installation
+#### 6. SQL Queries
+#### 7. SQLite3 Setup: TODOs
+
+</details>
+
 ## 9. API Request Methods
 ## 10. Authentication & Authorization (JWT)
 ## 11. Authenticate Requests
