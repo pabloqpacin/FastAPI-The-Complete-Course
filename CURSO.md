@@ -74,17 +74,15 @@
       - [5. DELETE Request](#5-delete-request)
   - [10. (7.3) Authentication \& Authorization (JWT)](#10-73-authentication--authorization-jwt)
       - [1. Routers: todos.py \& auth.py](#1-routers-todospy--authpy)
-      - [2. One-To-Many Relationship](#2-one-to-many-relationship)
-      - [3. Foreign Keys](#3-foreign-keys)
-      - [4. Create Users Table](#4-create-users-table)
-      - [5. Populate Users Table](#5-populate-users-table)
-      - [6. Hash User's Password](#6-hash-users-password)
-      - [7. Save User to DB](#7-save-user-to-db)
-      - [8. Authenticate User](#8-authenticate-user)
-      - [9. JSON Web Token (JWT) Overview](#9-json-web-token-jwt-overview)
-      - [10. Encode a JWT](#10-encode-a-jwt)
-      - [11. Decode a JWT](#11-decode-a-jwt)
-      - [12. Authentication Enhancements](#12-authentication-enhancements)
+      - [2. One-To-Many Relationship (mind FKs)](#2-one-to-many-relationship-mind-fks)
+      - [3. Rename SQLite DB, create Users table, add FK to Todos table](#3-rename-sqlite-db-create-users-table-add-fk-to-todos-table)
+      - [4. create\_users endpoint, hashed passwords (*passlib* + *bcrypt*)](#4-create_users-endpoint-hashed-passwords-passlib--bcrypt)
+      - [5. Save User to DB](#5-save-user-to-db)
+      - [6. Authenticate User](#6-authenticate-user)
+      - [7. JSON Web Token (JWT) Overview](#7-json-web-token-jwt-overview)
+      - [8. Encode a JWT](#8-encode-a-jwt)
+      - [9. Decode a JWT](#9-decode-a-jwt)
+      - [10. Authentication Enhancements](#10-authentication-enhancements)
   - [11. Authenticate Requests](#11-authenticate-requests)
   - [12. Large Production Database Setup](#12-large-production-database-setup)
   - [13. Project 3.5 - Alembic Data Migration](#13-project-35---alembic-data-migration)
@@ -118,7 +116,7 @@ python3 --version && python3 -c 'print("Hello World!")'
   # Python 3.10.12
   # Hello World!
 
-python3 -m pip --version  # && pip install pip-autoremove -y
+python3 -m pip --version  # && pip install isort pip-autoremove -y
   # pip 22.0.2 from /home/pabloqpacin/repos/FastAPI-The-Complete-Course/.venv/lib/python3.10/site-packages/pip (python 3.10)
 
 # ---
@@ -2618,6 +2616,10 @@ curl localhost:8000/todo/2
 
 ## 10. (7.3) Authentication & Authorization (JWT)
 
+<!-- AUTOPOPULATE SQLITE!?!?! -->
+
+> - For each API request, a user will have their ID attached
+> - Thus we can use the ID so return the todos according to the FK!!
 
 #### 1. Routers: todos.py & auth.py
 
@@ -2660,25 +2662,221 @@ async def get_user():
     return {'user':'authenticated'}
 ```
 
-#### 2. One-To-Many Relationship
+#### 2. One-To-Many Relationship (mind FKs)
+
+- example Users table
+
+| ID (PK) | email           | username  | first_name  | last_name | hashed_password | is_active
+| ---     | ---             | ---       | ---         | ---       | ---             | ---
+| 1       | foo@example.com | foo       | foo         | example   | 123abc          | 1
+| 2       | bar@example.com | bar       | bar         | example   | 123xyz          | 1
+
+- relationship users ~ todos
+  - 1 user > n todos
+  - 1 todo > 1 user
+
+```mermaid
+erDiagram
+
+user ||--o{ todo : has
+user{
+  int id PK
+  str email
+  str username
+  str first_name
+  str last_name
+  str hashed_password
+  bool is_active
+  str role
+}
+todo {
+  int id PK
+  str title
+  str description
+  int priority
+  bool complete
+  int owner FK
+}
+```
+
+- **FK**: column in a table that references a PK on a second table to establish a link
+  - we'll get associate each request with a user id via JWT, and retrieve relevant todos based on their FK
 
 
+#### 3. Rename SQLite DB, create Users table, add FK to Todos table
+
+> [!IMPORTANT]
+> Later on, we'll use Alembic to 'enhance/populate' tables (SQLAlchemy can only create'em)
+
+- rename our SQLite DB from `todos.db` to `todosapp.db` at [./database.py](/03-todos-database/database.py)
+- at [./models.py](/03-todos-database/models.py), create new `users` table and add FK to `todos` table
+
+```py
+# database.py
+
+SQLALCHEMY_DATABASE_URL='sqlite:///./todosapp.db'
+```
+```py
+# models.py
+
+from database import Base
+from sqlalchemy import Column,Integer,String,Boolean,ForeignKey
+
+# Table
+class Users(Base):
+    __tablename__='users'
+
+    id=Column(Integer,primary_key=True,index=True)
+    email=Column(String,unique=True)
+    username=Column(String,unique=True)
+    first_name=Column(String)
+    last_name=Column(String)
+    hashed_password=Column(String)
+    is_active=Column(Boolean,default=True)
+    role=Column(String)
+
+# Table
+class Todos(Base):
+    __tablename__='todos'
+    # ...
+    owner_id=Column(Integer,ForeignKey("users.id"))
+```
+
+#### 4. create_users endpoint, hashed passwords (*passlib* + *bcrypt*)
+
+> [!CAUTION]
+> Passlib requires a deprecated version of Bcrypt, hence we should not use passlib ([src](https://github.com/pyca/bcrypt/issues/684#issuecomment-1902590553))
+
+- Install passlib and bcrypt ~~([src](https://passlib.readthedocs.io/en/stable/install.html))~~
+
+```bash
+# source .venv/bin/activate
+
+# pip install "passlib[bcrypt]" || \
+pip install passlib
+pip install bcrypt==4.0.1
+
+# pip list | wc -l
+#   # 42
+```
+<!--
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/home/pabloqpacin/repos/FastAPI-The-Complete-Course/.venv/lib/python3.10/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+AttributeError: module 'bcrypt' has no attribute '__about__'
+
+https://github.com/pyca/bcrypt/issues/684#issuecomment-1902590553
+...
+-->
+
+- Update [./routers/auth.py](/03-todos-database/routers/auth.py) for a `create_user` endpoint!
+
+```py
+from fastapi import APIRouter
+from pydantic import BaseModel
+from models import Users
+from passlib.context import CryptContext
+
+router = APIRouter()
+
+bcrypt_context = CryptContext(schemes=['bcrypt'],deprecated='auto')
+
+class CreateUserRequest(BaseModel):
+    username:str
+    email:str
+    first_name:str
+    last_name:str
+    password:str
+    role:str
+
+# ---
+
+@router.post("/auth")
+async def create_user(create_user_request:CreateUserRequest,):
+    # create_user_model = Users(**create_user_request.model_dump()) # won't work bc password, not hashed_password
+    create_user_model = Users(
+        username=create_user_request.username,
+        email=create_user_request.email,
+        first_name=create_user_request.first_name,
+        last_name=create_user_request.last_name,
+        hashed_password=bcrypt_context.hash(create_user_request.password),
+        role=create_user_request.role,
+        is_active=True
+    )
+    return create_user_model
+```
+
+```bash
+curl -X 'POST' \
+  'http://localhost:8000/auth' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "username": "foo",
+  "email": "foo@example.com",
+  "first_name": "foo",
+  "last_name": "example",
+  "password": "123abc",
+  "role": "admin"
+}'
+  # {"username":"foo","email":"foo@example.com","first_name":"foo","last_name":"example","hashed_password":"$2b$12$2sgedDcNpk6wfBxvEFmQ7ONU41ISa/TJWu55er8RPGO1ID1hqEXEW","role":"admin","is_active":true}%
+
+# sqlite3 todosapp.db "select * from users;"
+#   # Not saving to DB yet!!
+```
+
+#### 5. Save User to DB
+
+- modificar [./auth.py](/03-todos-database/routers/auth.py)
+
+```py
+from fastapi import APIRouter, Depends
+from database import SessionLocal
+from typing import Annotated
+from sqlalchemy.orm import Session
 
 
-#### 3. Foreign Keys
-#### 4. Create Users Table
-#### 5. Populate Users Table
-#### 6. Hash User's Password
-#### 7. Save User to DB
-#### 8. Authenticate User
-#### 9. JSON Web Token (JWT) Overview
-#### 10. Encode a JWT
-#### 11. Decode a JWT
-#### 12. Authentication Enhancements
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+db_dependency=Annotated[Session,Depends(get_db)]
+
+
+```
+```bash
+curl -X 'POST' \
+  'http://localhost:8000/auth' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "username": "foo",
+  "email": "foo@example.com",
+  "first_name": "foo",
+  "last_name": "example",
+  "password": "123abc",
+  "role": "admin"
+}'
+  # null%
+
+sqlite3 todosapp.db "select * from users;"
+  # 1|foo@example.com|foo|foo|example|$2b$12$7FEvQoIB77yV7vAFlAYYIOia5MI7nFjMzorsIJSC5NoT.r526w2SC|1|admin
+```
+
+
+#### 6. Authenticate User
+#### 7. JSON Web Token (JWT) Overview
+#### 8. Encode a JWT
+#### 9. Decode a JWT
+#### 10. Authentication Enhancements
 
 ## 11. Authenticate Requests
 ## 12. Large Production Database Setup
-## 13. Project 3.5 - Alembic Data Migration
+## 13. Project 3.5 - [Alembic](https://alembic.sqlalchemy.org/en/latest/) Data Migration
 ## 14. Project 4 - Unit & Integration Testing
 ## 15. Project 5 - Full Stack Application
 ## 16. Git - Version Control
