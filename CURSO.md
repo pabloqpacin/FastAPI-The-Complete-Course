@@ -58,12 +58,13 @@
       - [14. HTTP Exceptions](#14-http-exceptions)
       - [15. Explicit Status Code Responses](#15-explicit-status-code-responses)
   - [7. Project 3 - Complete RESTful APIs](#7-project-3---complete-restful-apis)
-  - [8. Setup Database ](#8-setup-database-)
+  - [8. Setup Database (7.1) ](#8-setup-database-71-)
+      - [1. Intro](#1-intro-1)
       - [2. DB Connection with ORM SQLAlchemy](#2-db-connection-with-orm-sqlalchemy)
       - [3. DB Tables (Models)](#3-db-tables-models)
       - [4. main: DB Conn. for API \& init](#4-main-db-conn-for-api--init)
       - [5. SQLite3 Installation](#5-sqlite3-installation)
-      - [6. SQL Queries](#6-sql-queries)
+      - [6. SQL Queries Crash-Course](#6-sql-queries-crash-course)
       - [7. SQLite3 Setup: TODOs](#7-sqlite3-setup-todos)
   - [9. API Request Methods](#9-api-request-methods)
   - [10. Authentication \& Authorization (JWT)](#10-authentication--authorization-jwt)
@@ -2255,11 +2256,13 @@ FastAPI -. fetch users & save TODOs .-> Database
 
 ---
 
-## 8. Setup Database <!--(*Dockerized* PostgreSQL)-->
+## 8. Setup Database (7.1) <!--(*Dockerized* PostgreSQL)-->
 
 <details>
 
-<!-- 
+<!-- > db mysql - https://github.com/pabloqpacin/proyecto_lemp_compose/blob/main/compose.yaml -->
+
+
 #### 1. Intro
 
 - **Database**: easily accessible, modifiable, controlled and organized; atm we use SQL
@@ -2267,14 +2270,11 @@ FastAPI -. fetch users & save TODOs .-> Database
 - **Database Management Systems (DBMS)**: SQLite, MySQL, PostreSQL
 - **SQL**: relational DBs with tables etc.
 - ~~**Usecase**: store, retrieve and modify data~~
- -->
+
 
 #### 2. DB Connection with ORM SQLAlchemy
 
-> [!IMPORTANT]
-> Install SQLAlchemy with `.venv` activated!
-
-- Instalar [SQLAlchemy](https://www.sqlalchemy.org/)
+- Instalar [SQLAlchemy](https://www.sqlalchemy.org/) en el `.venv`
 
 ```bash
 # source .venv/bin/activate
@@ -2361,8 +2361,74 @@ file ./todos.db
 ```
 
 #### 5. SQLite3 Installation
-#### 6. SQL Queries
+ 
+```bash
+# docker compose up ... || \
+# docker run ... || \
+
+sudo apt install sqlite -y
+  # 3 pkgs
+```
+
+#### 6. SQL Queries Crash-Course
+
+Ejemplos de SQL...
+
+```sql
+-- Insert data
+insert into todos (title,description,priority,complete) values (
+  'Go to store','foo',4,False
+);
+
+-- Select data
+select * from todos where priority=5;
+
+select title,description,priority from todos
+  where complete=False
+;
+
+-- Update data
+update todos set complete=True where id=5;
+
+-- Delete data
+delete from todos where complete=False;
+delete from todos where id=5;
+```
+
 #### 7. SQLite3 Setup: TODOs
+
+```bash
+sqlite3 todos.db ".schema"
+  # CREATE TABLE todos (
+  #         id INTEGER NOT NULL,
+  #         title VARCHAR,
+  #         description VARCHAR,
+  #         priority INTEGER,
+  #         complete BOOLEAN,
+  #         PRIMARY KEY (id)
+  # );
+  # CREATE INDEX ix_todos_id ON todos (id);
+
+sqlite3 todos.db "insert into todos (title,description,priority,complete) values
+  ('Go to store','foo',4,False),
+  ('Haircut','foo',3,False),
+  ('Feed dog','foo',5,False),
+  ('Water plant','foo',4,False),
+  ('Learn something new','foo',5,False)
+;"
+
+sqlite3 todos.db "select * from todos;"
+  # 1|Go to store|foo|4|0
+  # 2|Haircut|foo|3|0
+  # 3|Feed dog|foo|5|0
+  # 4|Water plant|foo|4|0
+  # 5|Learn something new|foo|5|0
+
+sqlite3 todos.db { -column || -markdown || -box || -table } "select * from todos;"
+  # ...
+```
+
+
 
 </details>
 

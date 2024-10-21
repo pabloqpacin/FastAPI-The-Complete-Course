@@ -3,6 +3,7 @@
 
 # python et al.
 .venv/
+*.db
 
 /fastapienv/
 /.idea/FastAPI-The-Complete-Course.iml
