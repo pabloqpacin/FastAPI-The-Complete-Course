@@ -72,7 +72,19 @@
       - [3. POST Request](#3-post-request)
       - [4. PUT Request](#4-put-request)
       - [5. DELETE Request](#5-delete-request)
-  - [10. Authentication \& Authorization (JWT)](#10-authentication--authorization-jwt)
+  - [10. (7.3) Authentication \& Authorization (JWT)](#10-73-authentication--authorization-jwt)
+      - [1. Routers: todos.py \& auth.py](#1-routers-todospy--authpy)
+      - [2. One-To-Many Relationship](#2-one-to-many-relationship)
+      - [3. Foreign Keys](#3-foreign-keys)
+      - [4. Create Users Table](#4-create-users-table)
+      - [5. Populate Users Table](#5-populate-users-table)
+      - [6. Hash User's Password](#6-hash-users-password)
+      - [7. Save User to DB](#7-save-user-to-db)
+      - [8. Authenticate User](#8-authenticate-user)
+      - [9. JSON Web Token (JWT) Overview](#9-json-web-token-jwt-overview)
+      - [10. Encode a JWT](#10-encode-a-jwt)
+      - [11. Decode a JWT](#11-decode-a-jwt)
+      - [12. Authentication Enhancements](#12-authentication-enhancements)
   - [11. Authenticate Requests](#11-authenticate-requests)
   - [12. Large Production Database Setup](#12-large-production-database-setup)
   - [13. Project 3.5 - Alembic Data Migration](#13-project-35---alembic-data-migration)
@@ -2239,6 +2251,7 @@ curl -v -X 'DELETE' \
 
 </details>
 
+---
 
 ## 7. Project 3 - Complete RESTful APIs
 
@@ -2603,7 +2616,66 @@ curl localhost:8000/todo/2
 
 
 
-## 10. Authentication & Authorization (JWT)
+## 10. (7.3) Authentication & Authorization (JWT)
+
+
+#### 1. Routers: todos.py & auth.py
+
+- **routers**: a way to have our main file (root of our app) interact with other API files/endpoints...
+- create [./routers/todos.py](/03-todos-database/routers/todos.py) for [./main.py](/03-todos-database/main.py)'s Todos logic (*refactor*), and create [./routers/auth.py](/03-todos-database/routers/auth.py) (verificar endpoints en Swagger)
+
+
+```py
+# main.py
+
+from fastapi import FastAPI
+from database import engine
+import models
+from routers import auth, todos
+
+
+app = FastAPI()
+
+models.Base.metadata.create_all(bind=engine)
+
+app.include_router(auth.router)
+app.include_router(todos.router)
+```
+```py
+# routers/todos.py
+
+# ...
+```
+```py
+# routers/auth.py
+
+from fastapi import APIRouter
+
+router = APIRouter()
+
+# ---
+
+@router.get("/auth/")
+async def get_user():
+    return {'user':'authenticated'}
+```
+
+#### 2. One-To-Many Relationship
+
+
+
+
+#### 3. Foreign Keys
+#### 4. Create Users Table
+#### 5. Populate Users Table
+#### 6. Hash User's Password
+#### 7. Save User to DB
+#### 8. Authenticate User
+#### 9. JSON Web Token (JWT) Overview
+#### 10. Encode a JWT
+#### 11. Decode a JWT
+#### 12. Authentication Enhancements
+
 ## 11. Authenticate Requests
 ## 12. Large Production Database Setup
 ## 13. Project 3.5 - Alembic Data Migration
