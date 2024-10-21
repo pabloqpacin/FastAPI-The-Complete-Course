@@ -58,7 +58,7 @@
       - [14. HTTP Exceptions](#14-http-exceptions)
       - [15. Explicit Status Code Responses](#15-explicit-status-code-responses)
   - [7. Project 3 - Complete RESTful APIs](#7-project-3---complete-restful-apis)
-  - [8. Setup Database (7.1) ](#8-setup-database-71-)
+  - [8. (7.1) Setup Database ](#8-71-setup-database-)
       - [1. Intro](#1-intro-1)
       - [2. DB Connection with ORM SQLAlchemy](#2-db-connection-with-orm-sqlalchemy)
       - [3. DB Tables (Models)](#3-db-tables-models)
@@ -66,7 +66,12 @@
       - [5. SQLite3 Installation](#5-sqlite3-installation)
       - [6. SQL Queries Crash-Course](#6-sql-queries-crash-course)
       - [7. SQLite3 Setup: TODOs](#7-sqlite3-setup-todos)
-  - [9. API Request Methods](#9-api-request-methods)
+  - [9. (7.2) API Request CRUD Methods](#9-72-api-request-crud-methods)
+      - [1. GET All Todos from DB](#1-get-all-todos-from-db)
+      - [2. GET Todo by ID](#2-get-todo-by-id)
+      - [3. POST Request](#3-post-request)
+      - [4. PUT Request](#4-put-request)
+      - [5. DELETE Request](#5-delete-request)
   - [10. Authentication \& Authorization (JWT)](#10-authentication--authorization-jwt)
   - [11. Authenticate Requests](#11-authenticate-requests)
   - [12. Large Production Database Setup](#12-large-production-database-setup)
@@ -2256,7 +2261,7 @@ FastAPI -. fetch users & save TODOs .-> Database
 
 ---
 
-## 8. Setup Database (7.1) <!--(*Dockerized* PostgreSQL)-->
+## 8. (7.1) Setup Database <!--(*Dockerized* PostgreSQL)-->
 
 <details>
 
@@ -2432,7 +2437,172 @@ sqlite3 todos.db { -column || -markdown || -box || -table } "select * from todos
 
 </details>
 
-## 9. API Request Methods
+## 9. (7.2) API Request CRUD Methods
+
+<details>
+
+#### 1. GET All Todos from DB
+
+- Connection via dependency injection
+
+```py
+# main.py
+
+from fastapi import FastAPI, Depends
+from database import engine, SessionLocal
+import models
+from models import Todos
+from typing import Annotated
+from sqlalchemy.orm import Session
+
+app = FastAPI()
+
+models.Base.metadata.create_all(bind=engine)
+
+# ---
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+db_dependency=Annotated[Session,Depends(get_db)]
+
+@app.get("/")
+async def read_all(db:db_dependency):
+    return db.query(Todos).all()
+```
+```bash
+curl http://localhost:8000/
+  # [{"description":"foo","complete":false,"id":1,"priority":4,"title":"Go to store"},{"description":"foo","complete":false,"id":2,"priority":3,"title":"Haircut"},{"description":"foo","complete":false,"id":3,"priority":5,"title":"Feed dog"},{"description":"foo","complete":false,"id":4,"priority":4,"title":"Water plant"},{"description":"foo","complete":false,"id":5,"priority":5,"title":"Learn something new"}]%
+```
+
+#### 2. GET Todo by ID
+
+```py
+from fastapi import FastAPI, Depends, HTTPException, Path
+from starlette import status
+
+@app.get("/todo/{todo_id}",status_code=status.HTTP_200_OK)
+async def read_todo(db:db_dependency,todo_id:int =Path(gt=0)):
+    todo_model = db.query(Todos).filter(Todos.id == todo_id).first()
+    if todo_model is not None:
+        return todo_model
+    raise HTTPException(status_code=404,detail='Todo not found.')
+```
+```bash
+curl http://localhost:8000/todo/2
+  # {"title":"Haircut","priority":3,"description":"foo","id":2,"complete":false}%
+
+curl http://localhost:8000/todo/22
+  # {"detail":"Todo not found."}%
+
+curl http://localhost:8000/todo/-2
+  # {"detail":[{"type":"greater_than","loc":["path","todo_id"],"msg":"Input should be greater than 0","input":"-2","ctx":{"gt":0}}]}%
+```
+
+#### 3. POST Request
+
+- We don't pass ID in the Request
+
+```py
+from pydantic import BaseModel, Field
+
+class TodoRequest(BaseModel):
+    title:str =Field(min_length=3)
+    description:str =Field(min_length=3,max_length=100)
+    priority:int =Field(gt=0,lt=6)
+    complete:bool
+
+@app.post("/todo",status_code=status.HTTP_201_CREATED)
+async def create_todo(db:db_dependency,todo_request:TodoRequest):
+    todo_model = Todos(**todo_request.model_dump())
+    db.add(todo_model)
+    db.commit()
+```
+```bash
+curl localhost:8000
+  # [{"description":"foo","id":1,"complete":false,"priority":4,"title":"Go to store"},{"description":"foo","id":2,"complete":false,"priority":3,"title":"Haircut"},{"description":"foo","id":3,"complete":false,"priority":5,"title":"Feed dog"},{"description":"foo","id":4,"complete":false,"priority":4,"title":"Water plant"},{"description":"foo","id":5,"complete":false,"priority":5,"title":"Learn something new"}]%
+
+curl -X 'POST' \
+  'http://localhost:8000/todo' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "title": "Learn FastAPI",
+  "description": "bar",
+  "priority": 4,
+  "complete": false
+}'
+  # null%
+
+curl localhost:8000
+  # [{"description":"foo","id":1,"complete":false,"priority":4,"title":"Go to store"},{"description":"foo","id":2,"complete":false,"priority":3,"title":"Haircut"},{"description":"foo","id":3,"complete":false,"priority":5,"title":"Feed dog"},{"description":"foo","id":4,"complete":false,"priority":4,"title":"Water plant"},{"description":"foo","id":5,"complete":false,"priority":5,"title":"Learn something new"},{"description":"bar","id":6,"complete":false,"priority":4,"title":"Learn FastAPI"}]%
+```
+
+#### 4. PUT Request
+
+```py
+@app.put("/todo/{todo_id}",status_code=status.HTTP_204_NO_CONTENT)
+async def update_todo(db:db_dependency,
+                      todo_request:TodoRequest,
+                      todo_id:int =Path(gt=0)):
+    todo_model = db.query(Todos).filter(Todos.id == todo_id).first()
+    if todo_model is None:
+        raise HTTPException(status_code=404,detail='Todo not found.')
+    
+    todo_model.title=todo_request.title
+    todo_model.description=todo_request.description
+    todo_model.priority=todo_request.priority
+    todo_model.complete=todo_request.complete
+
+    db.add(todo_model)
+    db.commit()
+```
+```bash
+curl localhost:8000/todo/3
+  # {"description":"foo","complete":false,"id":3,"priority":5,"title":"Feed dog"}%
+
+curl -X 'PUT' \
+  'http://localhost:8000/todo/3' \
+  -H 'accept: */*' \
+  -H 'Content-Type: application/json' \
+  -d '{"description":"foo","complete":false,"priority":5,"title":"Feed cat"}'
+
+curl localhost:8000/todo/3
+  # {"description":"foo","complete":false,"id":3,"priority":5,"title":"Feed cat"}%
+```
+
+#### 5. DELETE Request
+
+```py
+@app.delete("/todo/{todo_id}",status_code=status.HTTP_204_NO_CONTENT)
+async def delete_todo(db:db_dependency,todo_id:int =Path(gt=0)):
+    todo_model = db.query(Todos).filter(Todos.id == todo_id).first()
+    if todo_model is None:
+        raise HTTPException(status_code=404,detail='Todo not found.')
+    db.query(Todos).filter(Todos.id == todo_id).delete()
+    db.commit()
+```
+```bash
+curl localhost:8000/todo/2
+  # {"description":"foo","complete":false,"id":2,"priority":3,"title":"Haircut"}%
+
+curl -X 'DELETE' \
+  'http://localhost:8000/todo/2' \
+  -H 'accept: */*'
+
+curl localhost:8000/todo/2
+  # {"detail":"Todo not found."}%
+```
+
+
+</details>
+
+
+
 ## 10. Authentication & Authorization (JWT)
 ## 11. Authenticate Requests
 ## 12. Large Production Database Setup
