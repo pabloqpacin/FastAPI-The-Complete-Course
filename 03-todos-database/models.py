@@ -1,5 +1,7 @@
-from database import Base
 from sqlalchemy import Column,Integer,String,Boolean,ForeignKey
+
+from database import Base
+
 
 # Table
 class Users(Base):
