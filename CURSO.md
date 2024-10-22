@@ -78,7 +78,7 @@
       - [3. Rename SQLite DB, create Users table, add FK to Todos table](#3-rename-sqlite-db-create-users-table-add-fk-to-todos-table)
       - [4. create\_users endpoint, hashed passwords (*passlib* + *bcrypt*)](#4-create_users-endpoint-hashed-passwords-passlib--bcrypt)
       - [5. Save User to DB](#5-save-user-to-db)
-      - [6. Authenticate User](#6-authenticate-user)
+      - [6. Authenticate User (`python-multipart` + `OAuth2PasswordRequestForm`)](#6-authenticate-user-python-multipart--oauth2passwordrequestform)
       - [7. JSON Web Token (JWT) Overview](#7-json-web-token-jwt-overview)
       - [8. Encode a JWT](#8-encode-a-jwt)
       - [9. Decode a JWT](#9-decode-a-jwt)
@@ -2618,8 +2618,11 @@ curl localhost:8000/todo/2
 
 <!-- AUTOPOPULATE SQLITE!?!?! -->
 
-> - For each API request, a user will have their ID attached
-> - Thus we can use the ID so return the todos according to the FK!!
+> - For each API request, a user will have their ID attached via JWT
+> - Thus we can validate the JWT to use the ID and return any todos relevant to the FK!!
+
+<details>
+
 
 #### 1. Routers: todos.py & auth.py
 
@@ -2821,9 +2824,6 @@ curl -X 'POST' \
   "role": "admin"
 }'
   # {"username":"foo","email":"foo@example.com","first_name":"foo","last_name":"example","hashed_password":"$2b$12$2sgedDcNpk6wfBxvEFmQ7ONU41ISa/TJWu55er8RPGO1ID1hqEXEW","role":"admin","is_active":true}%
-
-# sqlite3 todosapp.db "select * from users;"
-#   # Not saving to DB yet!!
 ```
 
 #### 5. Save User to DB
@@ -2845,8 +2845,6 @@ def get_db():
         db.close()
 
 db_dependency=Annotated[Session,Depends(get_db)]
-
-
 ```
 ```bash
 curl -X 'POST' \
@@ -2867,12 +2865,248 @@ sqlite3 todosapp.db "select * from users;"
   # 1|foo@example.com|foo|foo|example|$2b$12$7FEvQoIB77yV7vAFlAYYIOia5MI7nFjMzorsIJSC5NoT.r526w2SC|1|admin
 ```
 
+#### 6. Authenticate User (`python-multipart` + `OAuth2PasswordRequestForm`)
 
-#### 6. Authenticate User
+- Instalar [python-multipart](https://multipart.fastapiexpert.com/) (en el `.venv`) si no está instalado (debería)
+
+```bash
+# source .venv/bin/activate
+
+if ! pip list | grep 'python-multipart'; then
+  pip install python-multipart
+fi
+```
+
+- Edit `auth.py` to fill **a user-pass form in Swagger** (or just use proper `curl`)
+
+```py
+# routers/auth.py
+
+from fastapi.security import OAuth2PasswordRequestForm
+
+def authenticate_user(username:str,password:str,db):
+    user = db.query(Users).filter(Users.username == username).first()
+    if not user:
+        return False
+    if not bcrypt_context.verify(password,user.hashed_password):
+        return False
+    return user
+
+@router.post("/token")
+async def login_for_access_token(form_data:Annotated[OAuth2PasswordRequestForm,Depends()],
+                                 db:db_dependency):
+    user = authenticate_user(form_data.username,form_data.password,db)
+    if not user:
+        return 'Failed Authentication'
+    return 'Succesful Authentication'
+
+    return form_data.username
+```
+```bash
+curl -X 'POST' \
+  'http://localhost:8000/token' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=password&username=a&password=a&scope=&client_id=&client_secret='
+  # "Failed Authentication"%
+
+curl -X 'POST' \
+  'http://localhost:8000/token' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=password&username=foo&password=123abc&scope=&client_id=&client_secret='
+  # "Succesful Authentication"%
+```
+
 #### 7. JSON Web Token (JWT) Overview
+
+> [Introduction to JSON Web Tokens](https://jwt.io/introduction)
+
+- **JWT**: self-contained way to securely transmit data and information between two parties using a JSON Object; digitally signed therefore trusted by the server; used for Authorization, not Authentication
+- **Process**: user logs in > server returns encoded str JWT; client sends request > authentication > sends JWT for validation (each time)
+- **Structure**: `header.payload.signature`
+  - `header`: two parts `alg` for signing algorithm, `typ` for token type (eg. `{"alg":"HS256","typ":"JWT"}`) encoded using *Base64*
+  - `payload`: actual data aka claims (3 types of claims), also encoded with Base64
+    - *[Registered](https://datatracker.ietf.org/doc/html/rfc7519#section-4.1)*: predefined, recommended but not mandatory (eg. `iss`, `exp` about 1h, `sub` as if ID)
+    - *Public*
+    - *Private*
+  - `signature`: is created using the `alg` in the header to hash out the encoder header, encoded payload and a secret (...)
+- Example:
+
+
+```json
+// JWT Header
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}
+```
+
+```json
+// JWT Payload
+{
+  "sub": "1234567890",
+  "username": "foo",
+  "email": "foo@example.com"
+}
+```
+```ts
+HMACSHA256(
+  base64UrlEncode(header) + "." +
+  base64UrlEncode(payload),
+  secret
+)
+```
+```ts
+// JSON Web Token
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+```
+
+- **Outcome**: unique JSON Web Token string based on the authentication, sent by the requester in the authorization header using the [bearer schema](https://swagger.io/docs/specification/v3_0/authentication/bearer-authentication/) (different than the basic authentication...)
+- **Ojo**: never send anything back to the client; JWT is safe as long as client doesn't know the secret key
+- **Usecase**: two apps (same provider) share the same secret, so two servers can handle decoding and authorization
+
+> CLEARLY RELEVANT FOR **MICROSERVICES**
+
 #### 8. Encode a JWT
+
+<!-- 
+> [!TIP]
+> Está [jwt.io](https://jwt.io/) pero vamos a usar [jwt-cli](https://github.com/mike-engel/jwt-cli) para automatizar y tal
+> ```
+> cargo install jwt-cli
+ -->
+
+- **objective**: return JWT if `login_for_access_token` is successful
+- install [python-jose](https://pypi.org/project/python-jose/)
+
+```bash
+pip install "python-jose[cryptography]"
+  # Successfully installed cffi-1.17.1 cryptography-43.0.3 ecdsa-0.19.0 pyasn1-0.6.1 pycparser-2.22 python-jose-3.3.0 rsa-4.9 six-1.16.0
+```
+
+- tweak `auth.py`
+
+```py
+from datetime import timedelta
+from jose import jwt
+
+    # openssl rand -hex 32
+SECRET_KEY='a3f34163c39774c189289aacc2629768423f54a0fe55c8058714b3c976ca984a'
+ALGORITHM='HS256'
+
+class Token(BaseModel):
+    access_token:str
+    token_type:str
+
+def create_access_token(username:str,user_id:int,expires_delta:timedelta):
+    encode={'sub':username,'id':user_id}
+    expires=datetime.now(timezone.utc)+expires_delta
+    encode.update({'exp':expires})
+    return jwt.encode(encode,SECRET_KEY,algorithm=ALGORITHM)
+
+# ---
+
+@router.post("/token",response_model=Token)
+async def login_for_access_token(form_data:Annotated[OAuth2PasswordRequestForm,Depends()],
+    # ...
+    token = create_access_token(user.username, user.id, timedelta(minutes=20))
+    return {'access_token':token,'token_type':'bearer'}
+```
+```bash
+curl -X 'POST' \
+  'http://localhost:8000/token' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=password&username=a&password=a&scope=&client_id=&client_secret='
+  # "Failed Authentication"%
+
+curl -X 'POST' \
+  'http://localhost:8000/token' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=password&username=foo&password=123abc&scope=&client_id=&client_secret='
+  # {"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmb28iLCJpZCI6MSwiZXhwIjoxNzI5NTQ5MzMyfQ.sPDGxrfsrhkquQ2rMxMys9yg2MU_5Eoon8asLXZ1oFY","token_type":"bearer"}%
+```
+
+- verify with jwt-cli
+
+```bash
+cargo install jwt-cli
+
+BEARER_TOKEN=$(curl -s -X 'POST' \
+  'http://localhost:8000/token' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=password&username=foo&password=123abc&scope=&client_id=&client_secret=' \
+| jq -r '.access_token')
+
+jwt decode $bearer_token
+  #
+  # Token header
+  # ------------
+  # {
+  #   "typ": "JWT",
+  #   "alg": "HS256"
+  # }
+  #
+  # Token claims
+  # ------------
+  # {
+  #   "exp": 1729549524,
+  #   "id": 1,
+  #   "sub": "foo"
+  # }
+```
+
+
+
 #### 9. Decode a JWT
+
+- **Recap**: user logs in with user-pass returning a JWT > verify JWT to authenticate to API endpoints
+
+```py
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import jwt, JWTError
+
+# Verify the token as a dependency in our API requests
+oauth2_bearer = OAuth2PasswordBearer(tokenUrl='token')
+
+async def get_current_user(token:Annotated[str,Depends(oauth2_bearer)]):
+    try:
+        payload=jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
+        username:str=payload.get('sub')
+        user_id:int=payload.get('id')
+        if username is None or user_id is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                detail='Could not validate user.')
+        return {'username':username,'id':user_id}
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail='Could not validate user.')
+```
+
+
+
 #### 10. Authentication Enhancements
+
+- separate endpoints on the Swagger Web UI
+
+```py
+# routers/auth.py
+
+router = APIRouter(
+    prefix="/auth",
+    tags=["auth"]
+)
+
+oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/token')
+
+@router.post("/",status_code=status.HTTP_201_CREATED)
+```
+
+</details>
 
 ## 11. Authenticate Requests
 ## 12. Large Production Database Setup
