@@ -83,7 +83,15 @@
       - [8. Encode a JWT](#8-encode-a-jwt)
       - [9. Decode a JWT](#9-decode-a-jwt)
       - [10. Authentication Enhancements](#10-authentication-enhancements)
-  - [11. Authenticate Requests](#11-authenticate-requests)
+  - [11. (7.4) Authenticate Requests](#11-74-authenticate-requests)
+      - [0. CUSTOM: tweak `auth.py` for authentication with `curl`](#0-custom-tweak-authpy-for-authentication-with-curl)
+      - [1. POST Todo (user\_id)](#1-post-todo-user_id)
+      - [2. GET all Todos (user\_id)](#2-get-all-todos-user_id)
+      - [3. GET Todo (id + user\_id)](#3-get-todo-id--user_id)
+      - [4. PUT Todo (user\_id)](#4-put-todo-user_id)
+      - [5. DELETE Todo (user\_id)](#5-delete-todo-user_id)
+      - [6. Admin Router](#6-admin-router)
+      - [7. Assignment](#7-assignment)
   - [12. Large Production Database Setup](#12-large-production-database-setup)
   - [13. Project 3.5 - Alembic Data Migration](#13-project-35---alembic-data-migration)
   - [14. Project 4 - Unit \& Integration Testing](#14-project-4---unit--integration-testing)
@@ -3108,7 +3116,269 @@ oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/token')
 
 </details>
 
-## 11. Authenticate Requests
+## 11. (7.4) Authenticate Requests
+
+<!-- <details> -->
+
+> - básicamente modificar [routers/todos.py](/03-todos-database/routers/todos.py) para establecer autenticación
+
+
+#### 0. CUSTOM: tweak `auth.py` for authentication with `curl`
+
+- probarlo en el siguiente apartado de Todos...
+
+```py
+# auth.py
+
+async def get_current_user(token:Annotated[str,Depends(oauth2_bearer)]):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail='Could not validate credentials',
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload=jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
+        username:str=payload.get('sub')
+        user_id:int=payload.get('id')
+        if username is None or user_id is None:
+            raise credentials_exception
+        return {"username":username,"id":user_id}
+    except JWTError:
+        raise credentials_exception
+
+@router.post("/token",response_model=Token)
+async def login_for_access_token(form_data:Annotated[OAuth2PasswordRequestForm,Depends()],
+                                 db:db_dependency):
+    user = authenticate_user(form_data.username,form_data.password,db)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate":"Bearer"},
+        )
+    access_token_expires=timedelta(minutes=20)
+    access_token=create_access_token(user.username,user.id,access_token_expires)
+    return {"access_token":access_token,"token_type":"bearer"}
+```
+
+#### 1. POST Todo (user_id)
+
+> [!TIP]
+> En Swagger, pinchar el icono del candado en POST `/todo` para autenticarse!!
+
+```py
+from .auth import get_current_user
+
+user_dependency=Annotated[dict,Depends(get_current_user)]
+
+@router.post("/todo",status_code=status.HTTP_201_CREATED)
+async def create_todo(user:user_dependency,
+                      db:db_dependency,todo_request:TodoRequest):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    todo_model = Todos(**todo_request.model_dump(),owner_id=user.get('id'))
+    db.add(todo_model)
+    db.commit()
+```
+```bash
+curl -X 'POST' \
+  'http://localhost:8000/todo' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "title": "sup",
+  "description": "dawg",
+  "priority": 1,
+  "complete": true
+}'
+  # {"detail":"Not authenticated"}%
+
+  # Authenticate via Swagger UI
+curl -X 'POST' \
+  'http://localhost:8000/todo' \
+  -H 'accept: application/json' \
+  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmb28iLCJpZCI6MSwiZXhwIjoxNzI5NjIyODU3fQ.fwC5rrX2l2cqfmkrwXOOSziU45R5UYnYWwXPjv6wLCI' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "title": "sup",
+  "description": "dawg",
+  "priority": 1,
+  "complete": true
+}'
+  # null%
+```
+```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+)
+
+curl -X 'POST' \
+  'http://localhost:8000/todo' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "title": "sup",
+  "description": "dawg",
+  "priority": 1,
+  "complete": true
+}'
+  # null%   # 201 Created
+```
+
+#### 2. GET all Todos (user_id)
+
+```py
+@router.get("/")
+async def read_all(user:user_dependency,db:db_dependency):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    return db.query(Todos).filter(Todos.owner_id==user.get('id')).all()
+```
+```bash
+curl -X 'GET' \
+  'http://localhost:8000/' \
+  -H 'accept: application/json'
+  # {"detail":"Not authenticated"}%
+
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:8000/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"priority":1,"title":"sup","description":"dawg","owner_id":1,"id":1,"complete":true},{"priority":1,"title":"sup","description":"dawg","owner_id":1,"id":2,"complete":true},{"priority":1,"title":"sup","description":"dawg","owner_id":1,"id":3,"complete":true}]%
+```
+
+#### 3. GET Todo (id + user_id)
+
+```py
+@router.get("/todo/{todo_id}",status_code=status.HTTP_200_OK)
+async def read_todo(user:user_dependency,db:db_dependency,todo_id:int =Path(gt=0)):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    todo_model = db.query(Todos).filter(Todos.id == todo_id)\
+        .filter(Todos.owner_id==user.get('id')).first()
+    if todo_model is not None:
+        return todo_model
+    raise HTTPException(status_code=404,detail='Todo not found.')
+```
+```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:8000/todo/2' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"description":"dawg","title":"sup","priority":1,"owner_id":1,"id":2,"complete":true}%
+```
+
+#### 4. PUT Todo (user_id)
+
+```py
+@router.put("/todo/{todo_id}",status_code=status.HTTP_204_NO_CONTENT)
+async def update_todo(user:user_dependency,db:db_dependency,
+                      todo_request:TodoRequest,
+                      todo_id:int =Path(gt=0)):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    todo_model = db.query(Todos).filter(Todos.id == todo_id)\
+        .filter(Todos.owner_id==user.get('id')).first()
+    if todo_model is None:
+        raise HTTPException(status_code=404,detail='Todo not found.')
+    # ...
+```
+```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'PUT' \
+  'http://localhost:8000/todo/2' \
+  -H 'accept: */*' \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "title": "sup",
+  "description": "dawg",
+  "priority": 5,
+  "complete": true
+}'
+  # # 204 No Content
+
+curl -X 'GET' \
+  'http://localhost:8000/todo/2' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"description":"dawg","title":"sup","priority":5,"owner_id":1,"id":2,"complete":true}%
+```
+
+#### 5. DELETE Todo (user_id)
+
+```py
+@router.delete("/todo/{todo_id}",status_code=status.HTTP_204_NO_CONTENT)
+async def delete_todo(user:user_dependency,db:db_dependency,todo_id:int =Path(gt=0)):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    todo_model = db.query(Todos).filter(Todos.id == todo_id)\
+        .filter(Todos.owner_id==user.get('id')).first()
+    if todo_model is None:
+        raise HTTPException(status_code=404,detail='Todo not found.')
+    db.query(Todos).filter(Todos.id == todo_id)\
+        .filter(Todos.owner_id==user.get('id')).delete()
+    db.commit()
+```
+```bash
+curl -X 'DELETE' \
+  'http://localhost:8000/todo/2' \
+  -H 'accept: */*' \
+  -H "Authorization: Bearer $TOKEN"
+  # # 204 No Content
+
+curl -X 'GET' \
+  'http://localhost:8000/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"priority":1,"title":"sup","description":"dawg","owner_id":1,"id":1,"complete":true},{"priority":1,"title":"sup","description":"dawg","owner_id":1,"id":3,"complete":true}]%
+```
+
+#### 6. Admin Router
+
+```py
+```
+```bash
+```
+
+#### 7. Assignment
+
+```py
+```
+```bash
+```
+
+
+
+
+
+
+
+
+
+
+</details>
+
+---
+
+
 ## 12. Large Production Database Setup
 ## 13. Project 3.5 - [Alembic](https://alembic.sqlalchemy.org/en/latest/) Data Migration
 ## 14. Project 4 - Unit & Integration Testing
