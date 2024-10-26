@@ -3118,7 +3118,7 @@ oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/token')
 
 ## 11. (7.4) Authenticate Requests
 
-<!-- <details> -->
+<details>
 
 > - básicamente modificar [routers/todos.py](/03-todos-database/routers/todos.py) para establecer autenticación
 
@@ -3353,26 +3353,294 @@ curl -X 'GET' \
 
 #### 6. Admin Router
 
+- Crear rol admin para que ciertos usuarios puedan ver todos los Todos etc.
+
 ```py
+# routers/auth.py
+
+def create_access_token(username:str,user_id:int,role:str,expires_delta:timedelta):
+    encode={'sub':username,'id':user_id,'role':role}
+
+# async def get_current_user(token:Annotated[str,Depends(oauth2_bearer)]):
+        user_role:str=payload.get('role')
+        return {"username":username,"id":user_id,'user_role':user_role}
+
+# @router.post("/token",response_model=Token)
+    access_token=create_access_token(user.username,user.id,user.role,access_token_expires)
+```
+```py
+# routers/admin.py
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Path
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+from starlette import status
+
+from .auth import get_current_user
+from database import SessionLocal
+from models import Todos
+
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"]
+)
+
+# ---
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+db_dependency=Annotated[Session,Depends(get_db)]
+user_dependency=Annotated[dict,Depends(get_current_user)]
+
+# ---
+
+@router.get("/todo",status_code=status.HTTP_200_OK)
+async def read_all(user:user_dependency,db:db_dependency):
+    if user is None or user.get('user_role') != 'admin':
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    return db.query(Todos).all()
+```
+```py
+# main.py
+from routers import auth, todos, admin
+app.include_router(admin.router)
+```
+
+- Pruebas: tenemos usuario `foo` que es `admin`, creamos usuario `bar` sin rol, creamos un Todo de este nuevo usuario, y luego como ambos usuarios probamos a leer todos los todos (en `/` correspondientes al usuario) y todos los todos del nuevo endpoint `/admin/todo`
+
+```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:8000/admin/todo' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"description":"dawg","title":"sup","priority":1,"owner_id":1,"id":1,"complete":true}]%
 ```
 ```bash
+curl -X 'POST' \
+  'http://localhost:8000/auth/' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "username": "bar",
+  "email": "bar@example.com",
+  "first_name": "bar",
+  "last_name": "example",
+  "password": "123xyz",
+  "role": ""
+}'
+  # null%
+
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=bar&password=123xyz' \
+  | jq -r .access_token
+) && \
+curl -X 'POST' \
+  'http://localhost:8000/todo' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "title": "bar",
+  "description": "bar",
+  "priority": 1,
+  "complete": false
+}'
+  # null%
+
+curl -X 'GET' \
+  'http://localhost:8000/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"description":"bar","title":"bar","priority":1,"owner_id":2,"id":2,"complete":false}]%
+
+curl -X 'GET' \
+  'http://localhost:8000/admin/todo' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"detail":"Authentication Failed"}%
+
+# ---
+
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:8000/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"description":"dawg","title":"sup","priority":1,"owner_id":1,"id":1,"complete":true}]%
+
+curl -X 'GET' \
+  'http://localhost:8000/admin/todo' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"description":"dawg","title":"sup","priority":1,"owner_id":1,"id":1,"complete":true},{"description":"bar","title":"bar","priority":1,"owner_id":2,"id":2,"complete":false}]%
 ```
+
+- Crear y probar otro endpoint para DELETE
+
+```py
+# routers/admin.py
+
+@router.delete("/todo/{todo_id}",status_code=status.HTTP_204_NO_CONTENT)
+async def delete_todo(user:user_dependency,db:db_dependency,todo_id:int =Path(gt=0)):
+    if user is None or user.get('user_role') != 'admin':
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    todo_model = db.query(Todos).filter(Todos.id==todo_id).first()
+    if todo_model is None:
+        raise HTTPException(status_code=404,detail='Todo not found.')
+    db.query(Todos).filter(Todos.id==todo_id).delete()
+    db.commit()
+```
+```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:8000/admin/todo' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"title":"sup","priority":1,"description":"dawg","owner_id":1,"complete":true,"id":1},{"title":"bar","priority":1,"description":"bar","owner_id":2,"complete":false,"id":2}]%
+
+curl -X 'DELETE' \
+  'http://localhost:8000/admin/todo/2' \
+  -H 'accept: */*' \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -X 'GET' \
+  'http://localhost:8000/admin/todo' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"title":"sup","priority":1,"description":"dawg","owner_id":1,"complete":true,"id":1}]%
+```
+
+
 
 #### 7. Assignment
 
+- User provides old_password and new_password, we first need to verify the old_password and then do the update > crear clase *pydantic* `UserVerification(BaseModel)`
+
+```md
+1. Create a new route called Users.
+2. Then create 2 new API Endpoints:
+  - get_user: this endpoint should return all information about the user that is currently logged in.
+  - change_password: this endpoint should allow a user to change their current password.
+```
+
 ```py
+# routers/users.py
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Path
+from pydantic import BaseModel, Field
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+from starlette import status
+
+from .auth import get_current_user
+from database import SessionLocal
+from models import Users, Todos
+
+router = APIRouter(
+    prefix="/user",
+    tags=["user"]
+)
+
+# ---
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+db_dependency=Annotated[Session,Depends(get_db)]
+user_dependency=Annotated[dict,Depends(get_current_user)]
+bcrypt_context = CryptContext(schemes=['bcrypt'],deprecated='auto')
+
+class UserVerification(BaseModel):
+    password:str
+    new_password:str =Field(min_length=6)
+
+# ---
+
+@router.get("/",status_code=status.HTTP_200_OK)
+async def get_user(user:user_dependency,db:db_dependency):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    return db.query(Users).filter(Users.id == user.get('id')).first()
+
+# ===== PUT =====
+
+@router.put("/password",status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(user:user_dependency,db:db_dependency,
+                          user_verification:UserVerification):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    user_model = db.query(Users).filter(Users.id==user.get('id')).first()
+    if not bcrypt_context.verify(user_verification.password,user_model.hashed_password):
+        raise HTTPException(status_code=401,detail='Error on password change')
+    user_model.hashed_password = bcrypt_context.hash(user_verification.new_password)
+    db.add(user_model)
+    db.commit()
 ```
+```py
+# main.py
+from routers import auth, admin, users, todos
+app.include_router(users.router)
+```
+
 ```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:8000/user/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"username":"foo","last_name":"example","id":1,"is_active":true,"first_name":"foo","email":"foo@example.com","hashed_password":"$2b$12$7FEvQoIB77yV7vAFlAYYIOia5MI7nFjMzorsIJSC5NoT.r526w2SC","role":"admin"}%
+
+curl -X 'PUT' \
+  'http://localhost:8000/user/password' \
+  -H 'accept: */*' \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "password": "123abc",
+  "new_password": "123123"
+}'
+
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123123' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:8000/user/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"username":"foo","last_name":"example","id":1,"is_active":true,"first_name":"foo","email":"foo@example.com","hashed_password":"$2b$12$udHlG896h8puSb.Gsz64BulGrW74iZAgP.ZaybO6/C1KTl73NeUG2","role":"admin"}%
 ```
-
-
-
-
-
-
-
-
-
 
 </details>
 

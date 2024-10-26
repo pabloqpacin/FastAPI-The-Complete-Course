@@ -57,8 +57,8 @@ def authenticate_user(username:str,password:str,db):
         return False
     return user
 
-def create_access_token(username:str,user_id:int,expires_delta:timedelta):
-    encode={'sub':username,'id':user_id}
+def create_access_token(username:str,user_id:int,role:str,expires_delta:timedelta):
+    encode={'sub':username,'id':user_id,'role':role}
     expires=datetime.now(timezone.utc)+expires_delta
     # expires = datetime.utcnow() + expires_delta
     encode.update({'exp':expires})
@@ -74,9 +74,10 @@ async def get_current_user(token:Annotated[str,Depends(oauth2_bearer)]):
         payload=jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
         username:str=payload.get('sub')
         user_id:int=payload.get('id')
+        user_role:str=payload.get('role')
         if username is None or user_id is None:
             raise credentials_exception
-        return {"username":username,"id":user_id}
+        return {"username":username,"id":user_id,'user_role':user_role}
     except JWTError:
         raise credentials_exception
 
@@ -113,6 +114,6 @@ async def login_for_access_token(form_data:Annotated[OAuth2PasswordRequestForm,D
             headers={"WWW-Authenticate":"Bearer"},
         )
     access_token_expires=timedelta(minutes=20)
-    access_token=create_access_token(user.username,user.id,access_token_expires)
+    access_token=create_access_token(user.username,user.id,user.role,access_token_expires)
     return {"access_token":access_token,"token_type":"bearer"}
 
