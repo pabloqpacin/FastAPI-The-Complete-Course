@@ -1,0 +1,21 @@
+there is no point is it
+
+mock:
+
+---
+
+```yaml
+services:
+  sqlite:
+    image: alpine/sqlite:3.45.3
+    volumes:
+      - ./data:/apps
+    working_dir: /apps
+    # stdin_open: true  # For interactive mode
+    # tty: true         # Allocates a pseudo-TTY
+    ports:
+      - "5432:5432"
+  # docker compose up
+  # docker-compose exec sqlite sqlite3 test.db "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);"
+  # ls -l data/test.db
+```

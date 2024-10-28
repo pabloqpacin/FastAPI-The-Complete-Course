@@ -92,7 +92,13 @@
       - [5. DELETE Todo (user\_id)](#5-delete-todo-user_id)
       - [6. Admin Router](#6-admin-router)
       - [7. Assignment](#7-assignment)
-  - [12. Large Production Database Setup](#12-large-production-database-setup)
+  - [12. (7.5) Dockerized FastAPI with PostgreSQL (~~Large Production Database Setup~~)](#12-75-dockerized-fastapi-with-postgresql-large-production-database-setup)
+    - [I. Dockerizar FastAPI](#i-dockerizar-fastapi)
+    - [II. Implantar stack y verificar FastAPI requests](#ii-implantar-stack-y-verificar-fastapi-requests)
+      - [2. PostgreSQL Installation (Docker Compose!!)](#2-postgresql-installation-docker-compose)
+      - [3. PostgreSQL: Create Database Table](#3-postgresql-create-database-table)
+      - [4. Connect PostgreSQL to FastAPI](#4-connect-postgresql-to-fastapi)
+      - [~~5. MySQL~~](#5-mysql)
   - [13. Project 3.5 - Alembic Data Migration](#13-project-35---alembic-data-migration)
   - [14. Project 4 - Unit \& Integration Testing](#14-project-4---unit--integration-testing)
   - [15. Project 5 - Full Stack Application](#15-project-5---full-stack-application)
@@ -3647,7 +3653,504 @@ curl -X 'GET' \
 ---
 
 
-## 12. Large Production Database Setup
+## 12. (7.5) Dockerized FastAPI with PostgreSQL (~~Large Production Database Setup~~)
+
+<!-- NO MySQL... -->
+
+<!-- https://fastapi.tiangolo.com/deployment/docker/#build-a-docker-image-with-a-single-file-fastapi -->
+
+<!-- <details> -->
+
+> [!IMPORTANT]
+> Podríamos implantar [pgAdmin](https://www.pgadmin.org/docs/pgadmin4/latest/container_deployment.html) tanto en tanto en el server (ver [docker-compose.yaml](/03-todos-database/docker-compose.yaml)) como en nuestra Workstation con otro setup...
+
+- **Objetivos**: implantar una BD relacional (PostgreSQL y MySQL) e implementar CRUD Operations
+- **Objetivos CUSTOM**: Dockerizarlo todo
+- **Diferencias DBMS vs SQLite**: diapositivas 133-... en [../docs/FastAPI_slides.pdf](/docs/FastAPI_slides.pdf)...
+
+
+### I. Dockerizar FastAPI
+
+>  Tareas: `requirements.txt`, `app/`, `Dockerfile`, `.env.example`, `docker-compose.yaml`, `db/fastapi_todos.sql`, `SQLALCHEMY_DATABASE_URL`... 
+
+1. Generamos nuestro [requirements.txt](/03-todos-database/requirements.txt) desde el `.venv` tras instalar una última dependencia ([psycopg2-binary](https://pypi.org/project/psycopg2-binary/))
+
+
+```bash
+# source .venv/bin/activate
+
+pip install psycopg2-binary
+
+pip freeze > 03-todos-database/requirements.txt
+```
+
+2. Nos aseguramos de que el nuevo directorio raíz de nuestra app FastAPI está en un subdirectorio `app/` (luego habrá que modificar el [app/database.py](/03-todos-database/app/database.py))
+
+```bash
+cd 03-todos-database
+
+mkdir app
+git mv routers *.py app/
+```
+
+3. Preparamos el [Dockerfile](/03-todos-database/Dockerfile) para la `app/`; entiendo que en prod. deberíamos:
+   - montar los archivos,
+   - cambiar el comando `dev` por `run` y
+   - verificar que funciona bien detrás de HAProxy (tema cabeceras y tal)
+
+```Dockerfile
+FROM python:3.12-slim-bullseye
+
+WORKDIR /app
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Descomentar y montar la app aquí en la imagen, no en el contenedor( docker-compose.yaml)
+# COPY ./app .
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+EXPOSE 80
+
+CMD ["fastapi", "dev", "/app/main.py", "--host", "0.0.0.0", "--port", "80"]
+# CMD ["fastapi", "run", "main.py", "--proxy-headers", "--port", "80"]
+```
+
+4. Preparamos el [docker-compose.yaml](/03-todos-database/docker-compose.yaml) (y el [.env.example](/03-todos-database/.env.example) correspondiente) con los servicios:
+   - **fastapi**: el puerto para Swagger (`/docs`) deja de ser el `8000` al `5012`
+   - **postgresql**: usaremos [db/fastapi_todos.sql](/03-todos-database/db/fastapi_todos.sql) para crear las tablas y p
+   - **pgadmin**: no está implementado pero sí preparado y comentado en el `docker-compose.yaml`, por si luego viniera bien usarlo
+
+
+```bash
+POSTGRES_DB=fastapi
+POSTGRES_USER=fastapi
+POSTGRES_PASSWORD=s_clpa59Bs?D]BP<AgI
+```
+
+```yaml
+services:
+
+  fastapi:
+    build:
+      context: .
+    container_name: fastapi
+    ports:
+      - "5012:80"
+    env_file:
+      - ./.env.example
+    # Para prod., comentar el volumen y montar la app/ en la imagen (Dockerfile)
+    volumes:
+      - ./app:/app
+    restart: unless-stopped
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+  postgresql:
+    image: postgres:16.1-alpine
+    container_name: postgresql
+    # Uncomment the port if we won't connect from outside (fastapi uses 5432 anyways)
+    ports:
+      - "5010:5432"
+    env_file:
+      - ./.env.example
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+      - ./db/fastapi_todos.sql:/docker-entrypoint-initdb.d/fastapi_todos.sql:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fastapi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgresql_data:
+```
+
+
+> [!IMPORTANT]
+> Documentación WIP, stack operativo!!
+
+
+
+---
+
+7. Preparamos el script [**/scripts/encrypt_password.py](/scripts/encrypt_password.py) para hashear un par de contras para un par de usuarios con los que queremos *populate* nuestra BD [./db/fastapi_todos.sql](/03-todos-database/db/fastapi_todos.sql) al inicializarla con Docker Compose.
+
+```py
+# scripts/encrypt_password.py
+# ---
+
+# source .venv/bin/activate && \
+# pip install passlib
+# (we should drop it tho, in app/ it requires us to use an outdated version of bcrypt as a dep.)
+
+import argparse
+from passlib.context import CryptContext
+
+# Set up the bcrypt context
+bcrypt_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
+
+def hash_password(password: str) -> str:
+    return bcrypt_context.hash(password)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Hash a password for SQL INSERT.")
+    parser.add_argument("password", help="Password to hash")
+    
+    args = parser.parse_args()
+    hashed_password = hash_password(args.password)
+    print(f"{args.password}: {hashed_password}")
+```
+
+```bash
+# source .venv/bin/activate
+
+python3 scripts/encrypt_password.py -h 123abc
+  # usage: encrypt_password.py [-h] password
+  # 
+  # Hash a password for SQL INSERT.
+  # 
+  # positional arguments:
+  #   password    Password to hash
+  # 
+  # options:
+  #   -h, --help  show this help message and exit
+
+python3 scripts/encrypt_password.py 123abc
+  # 123abc: $2b$12$86egHeQnfdXBJHgUX9WITO1Ma6gXD/3Pqcain/lEFR06u2tAzTH76
+
+python3 scripts/encrypt_password.py 123xyz
+  # 123xyz: x
+```
+
+5. Preparamos el [db/fastapi_todos.sql](/03-todos-database/db/fastapi_todos.sql)
+
+```sql
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+
+-- ===== CREATE TABLES =====
+
+DROP TABLE IF EXISTS users;
+CREATE TABLE users (
+  id SERIAL,
+  email varchar(200) DEFAULT NULL,
+  username varchar(45) DEFAULT NULL,
+  first_name varchar(45) DEFAULT NULL,
+  last_name varchar(45) DEFAULT NULL,
+  hashed_password varchar(200) DEFAULT NULL,
+  is_active boolean DEFAULT NULL,
+  role varchar(45) DEFAULT NULL,
+  PRIMARY KEY (id)
+);
+
+DROP TABLE IF EXISTS todos;
+CREATE TABLE todos (
+  id SERIAL,
+  title varchar(200) DEFAULT NULL,
+  description varchar(200) DEFAULT NULL,
+  priority integer DEFAULT NULL,
+  complete boolean DEFAULT NULL,
+  owner_id integer DEFAULT NULL,
+  PRIMARY KEY (id),
+  FOREIGN KEY (owner_id) REFERENCES users(id)
+);
+
+-- ===== POPULATE TABLES =====
+
+-- SELECT * FROM pg_extension;
+-- CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+/* Credenciales: foo==123abc; bar==123xyz */
+INSERT INTO users (email, username, first_name, last_name, hashed_password, is_active, role) VALUES
+-- ( 'foo@example.com', 'foo', 'foo', 'example', crypt('123abc', gen_salt('bf')), TRUE, 'admin'),
+  ( 'foo@example.com', 'foo', 'foo', 'example', '$2b$12$hevQQk73MbsOt5AG7Ofe7OZ6FWsp9Xwz8gh048fkK06ZuwS1lJ1DW', TRUE, 'admin'),
+  ( 'bar@example.com', 'bar', 'bar', 'example', '$2b$12$TFlZ99l/WK/hIhJHJPajk.GuloOgrntRwQ2SDmnu2shD4bPy7qXVq', TRUE, '')
+;
+
+INSERT INTO todos (title, description, priority, complete, owner_id) VALUES
+  ('Go to store','supdawg',4,false,1),
+  ('Haircut','supdawg',3,true,2),
+  ('Feed dog','supdawg',5,false,1),
+  ('Water plant','supdawg',4,false,2),
+  ('Learn something new','supdawg',5,true,1)
+;
+```
+
+
+
+
+
+10. Finalmente, definimos la conexión FastAPI > PostgreSQL en el [app/database.py](/03-todos-database/app/database.py) (~~ahora es prematuro~~)
+
+> - [ ] **DEUDA TÉCNICA**: sacar los valores de un `.env` con python `dotenv` para conexión o así o ke
+
+```py
+# SQLALCHEMY_DATABASE_URL='sqlite:///./todosapp.db'
+SQLALCHEMY_DATABASE_URL='postgresql://fastapi:s_clpa59Bs?D]BP<AgI@postgresql:5432/fastapi'
+
+# engine = create_engine(SQLALCHEMY_DATABASE_URL,connect_args={'check_same_thread':False})
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+```
+
+
+### II. Implantar stack y verificar FastAPI requests
+
+DEMO
+
+
+```bash
+docker compose up -d
+{
+  docker compose logs -f
+}
+
+docker exec -it postgresql psql -U fastapi -d fastapi -c "select * from users;"
+  #  id |      email      | username | first_name | last_name |                       hashed_password                        | is_active | role
+  # ----+-----------------+----------+------------+-----------+--------------------------------------------------------------+-----------+-------
+  #   1 | foo@example.com | foo      | foo        | example   | $2b$12$hevQQk73MbsOt5AG7Ofe7OZ6FWsp9Xwz8gh048fkK06ZuwS1lJ1DW | t         | admin
+  #   2 | bar@example.com | bar      | bar        | example   | $2b$12$TFlZ99l/WK/hIhJHJPajk.GuloOgrntRwQ2SDmnu2shD4bPy7qXVq | t         |
+  # (2 rows)
+
+TOKEN=$(curl -s -X 'POST' 'http://localhost:5012/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:5012/user/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"first_name":"foo","id":1,"last_name":"example","is_active":true,"username":"foo","email":"foo@example.com","hashed_password":"$2b$12$hevQQk73MbsOt5AG7Ofe7OZ6FWsp9Xwz8gh048fkK06ZuwS1lJ1DW","role":"admin"}%
+```
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### 2. PostgreSQL Installation (Docker Compose!!)
+
+> ![NOTE]
+> [pgAdmin](https://www.pgadmin.org/download/pgadmin-4-container/): web ui dockerizada en `localhost:8888` (~~ojo Documentación~~)
+
+```yaml
+# name: FastAPI
+
+services:
+
+  # fastapi:
+
+  postgresql:
+    image: postgres:16.1-alpine
+    hostname: postgresql
+    container_name: postgresql
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: fastapi
+      POSTGRES_PASSWORD: s_clpa59Bs?D]BP<AgI
+      POSTGRES_DB: fastapi
+    # env_file:
+    #   - ./api/input/.env
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+      # - ./api/input/create_tables.sql:/docker-entrypoint-initdb.d/create_tables.sql:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fastapi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:8.12
+    container_name: pgadmin
+    restart: always
+    ports:
+      - "8888:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: poc@setenova.es
+      PGADMIN_DEFAULT_PASSWORD: USd3Fiv2,tJ,b[H\2r{
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+volumes:
+  postgresql_data:
+  pgadmin_data:
+
+# xdg-open localhost:8888 > Login > poc@setenova.es==USd3Fiv2,tJ,b[H\2r{
+#   add new server:
+#     Name==FastAPI
+#     Hostname==postgresql
+#     Username==fastapi
+#     Password==s_clpa59Bs?D]BP<AgI
+#     save_password==true
+
+
+# TODO: integrar con vault.setenova.es para las contras
+# ---
+# https://medium.com/@vishal.sharma./run-postgresql-and-pgadmin-using-docker-compose-34120618bcf9
+```
+
+```bash
+# cd 03-todos-database
+docker compose up -d
+
+docker exec -it postgresql psql -U fastapi -d fastapi -c \
+  "select current_database();"
+
+xdg-open localhost:8888
+```
+```yaml
+pgAdmin:
+  Login:
+    email: poc@setenova.es
+    password: USd3Fiv2,tJ,b[H\2r{
+  Add New Server:
+    General:
+      Name: FastAPI
+    Connection:
+      Hostname: postgresql
+      Port: 5432
+      Username: fastapi
+      Password: s_clpa59Bs?D]BP<AgI
+      Save password: true
+```
+
+tema hashed_password:
+
+```bash
+dock exec -it postgresql -U fastapi -d fastapi -c "
+  select * from pg_extension;
+  CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+"
+```
+
+El requirements.txt lo obtenemos dentro del venv
+
+```bash
+source .venv/bin/activate
+pip freeze > 03-todos-database/requirements.txt
+```
+
+
+#### 3. PostgreSQL: Create Database Table
+
+- pgAdmin: conectar con la BD (ya lo hemos hecho)
+- pgAdmin: Servers > FastAPI > Login/Group Roles > **fastapi** > Properties > Privileges > All (**superuser**)
+  - necesitaríamos otros usuarios para los desarrolladores/usuarios?
+- pgAdmin: crear DB... no me gusta el click-click-click...
+
+```sql
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+
+DROP TABLE IF EXISTS users;
+CREATE TABLE users (
+  id SERIAL,
+  email varchar(200) DEFAULT NULL,
+  username varchar(45) DEFAULT NULL,
+  first_name varchar(45) DEFAULT NULL,
+  last_name varchar(45) DEFAULT NULL,
+  hashed_password varchar(200) DEFAULT NULL,
+  is_active boolean DEFAULT NULL,
+  role varchar(45) DEFAULT NULL,
+  PRIMARY KEY (id)
+);
+
+DROP TABLE IF EXISTS todos;
+CREATE TABLE todos (
+  id SERIAL,
+  title varchar(200) DEFAULT NULL,
+  description varchar(200) DEFAULT NULL,
+  priority integer  DEFAULT NULL,
+  complete boolean  DEFAULT NULL,
+  owner_id integer  DEFAULT NULL,
+  PRIMARY KEY (id),
+  FOREIGN KEY (owner_id) REFERENCES users(id)
+);
+```
+
+#### 4. Connect PostgreSQL to FastAPI
+
+```bash
+# source .venv/bin/activate
+pip install psycopg2-binary
+pip freeze > requirements.txt
+
+
+docker compose up
+
+docker exec -it postgresql psql -U fastapi -d fastapi -c \
+  "select * from users; select * from todos;"
+  #  id |      email      | username | first_name | last_name |                       hashed_password                        | is_active | role
+  # ----+-----------------+----------+------------+-----------+--------------------------------------------------------------+-----------+-------
+  #   1 | foo@example.com | foo      | foo        | example   | $2b$12$hevQQk73MbsOt5AG7Ofe7OZ6FWsp9Xwz8gh048fkK06ZuwS1lJ1DW | t         | admin
+  #   2 | bar@example.com | bar      | bar        | example   | $2b$12$TFlZ99l/WK/hIhJHJPajk.GuloOgrntRwQ2SDmnu2shD4bPy7qXVq | t         |
+  # (2 rows)
+
+  #  id |        title        | description | priority | complete | owner_id
+  # ----+---------------------+-------------+----------+----------+----------
+  #   1 | Go to store         | supdawg     |        4 | f        |        1
+  #   2 | Haircut             | supdawg     |        3 | t        |        2
+  #   3 | Feed dog            | supdawg     |        5 | f        |        1
+  #   4 | Water plant         | supdawg     |        4 | f        |        2
+  #   5 | Learn something new | supdawg     |        5 | t        |        1
+  # (5 rows)
+```
+```py
+curl create new_user
+
+curl create new_todo new_user
+
+curl get new_todo new_user
+
+curl admin list all todos
+```
+
+Ahora podríamos crear algún usuario con POST `/auth/`, pero ya tenemos un par gracias al script.sql
+
+#### ~~5. MySQL~~
+
+...
+
+
+
+
+</details>
+
+---
+
+
+
 ## 13. Project 3.5 - [Alembic](https://alembic.sqlalchemy.org/en/latest/) Data Migration
 ## 14. Project 4 - Unit & Integration Testing
 ## 15. Project 5 - Full Stack Application
