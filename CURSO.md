@@ -97,8 +97,11 @@
     - [II. Implantar stack y verificar FastAPI requests](#ii-implantar-stack-y-verificar-fastapi-requests)
     - [III. pgAdmin (opcional)](#iii-pgadmin-opcional)
     - [IV. MySQL (UNDONE)](#iv-mysql-undone)
-- [TEMA DOTENV](#tema-dotenv)
-  - [13. Project 3.5 - Alembic Data Migration](#13-project-35---alembic-data-migration)
+  - [13. (7.6) ~~Project 3.5~~ - Alembic Data Migration](#13-76-project-35---alembic-data-migration)
+      - [1. Alembic Overview](#1-alembic-overview)
+      - [2. Alembic Installation + Upgrade Operation](#2-alembic-installation--upgrade-operation)
+      - [3. Alembic Downgrade](#3-alembic-downgrade)
+      - [4. Alembic Assignment](#4-alembic-assignment)
   - [14. Project 4 - Unit \& Integration Testing](#14-project-4---unit--integration-testing)
   - [15. Project 5 - Full Stack Application](#15-project-5---full-stack-application)
   - [16. Git - Version Control](#16-git---version-control)
@@ -4005,18 +4008,260 @@ pgAdmin:
 
 ...
 
+</details>
 
 ---
 
 
-# TEMA DOTENV
+## 13. (7.6) ~~Project 3.5~~ - [Alembic](https://alembic.sqlalchemy.org/en/latest/) Data Migration
+
+<details>
+
+#### 1. Alembic Overview
+
+Modify existing tables with data. Diapositivas...
+
+
+#### 2. Alembic Installation + Upgrade Operation
+
+1. Instalar [alembic](https://alembic.sqlalchemy.org/en/latest/) con pip y actualizar el [requirements.txt](/03-todos-database/requirements.txt)
 
 ```bash
 # source .venv/bin/activate
-pip install python-dotenv
-  # Requirement already satisfied: python-dotenv in ./.venv/lib/python3.10/site-packages (1.0.1)
+pip install alembic
+  # Successfully installed Mako-1.3.6 alembic-1.13.3
+
+pip freeze > requirements.txt
 ```
 
+2. Inicializar alembic en el repo
+
+```bash
+cd 03-todos-database
+alembic init alembic
+
+# cat alembic.ini
+# ls alembic/
+```
+
+3. Configuramos en [alembic/env.py](/03-todos-database/alembic/env.py) la conexión entre alembic y nuestro postgresql dockerizado
+
+```py
+# alembic/env.py
+
+import sys
+import os
+from alembic import context
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+import models
+
+
+load_dotenv(dotenv_path="../.env.development", override=True)
+
+POSTGRES_USER = os.getenv('POSTGRES_USER',"fastapi")
+POSTGRES_PASSWORD = os.getenv('POSTGRES_PASSWORD')
+POSTGRES_HOST = os.getenv('POSTGRES_HOST', "postgresql")
+POSTGRES_PORT = os.getenv('POSTGRES_PORT',5432)
+POSTGRES_DB = os.getenv('POSTGRES_DB',"fastapi")
+
+SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+
+config = context.config
+config.set_main_option("sqlalchemy.url", SQLALCHEMY_DATABASE_URL)
+
+fileConfig(config.config_file_name)
+
+target_metadata = models.Base.metadata
+
+# ...
+```
+
+4. Actualizamos nuestro stack (`Dockerfile`) para montar `alembic/` directamente en la imagen, y luego operaremos mediante comandos `docker exec` directamente en el contenedor...
+
+```dockerfile
+RUN apt install -y vi && apt clean
+
+# COPY ./src .
+COPY ./alembic .
+COPY ./alembic.ini .
+
+CMD ["fastapi", "dev", "/app/src/main.py", "--host", "0.0.0.0", "--port", "80"]
+```
+
+```yaml
+services:
+  fastapi:
+    volumes:
+      - ./src:/app/src
+```
+
+5. Crear primera revisión (~~para incluir el `users.phone_number`~~) y verificar
+
+```bash
+# docker compose down --rmi all -v
+
+docker compose up -d && \
+docker compose logs -f
+
+docker exec -it postgresql psql -U fastapi -d fastapi -c "select * from users;"
+  #  id |      email      | username | first_name | last_name |                       hashed_password                        | is_active | role
+  # ----+-----------------+----------+------------+-----------+--------------------------------------------------------------+-----------+-------
+  #   1 | foo@example.com | foo      | foo        | example   | $2b$12$hevQQk73MbsOt5AG7Ofe7OZ6FWsp9Xwz8gh048fkK06ZuwS1lJ1DW | t         | admin
+  #   2 | bar@example.com | bar      | bar        | example   | $2b$12$TFlZ99l/WK/hIhJHJPajk.GuloOgrntRwQ2SDmnu2shD4bPy7qXVq | t         |
+  # (2 rows)
+```
+
+```bash
+# Variables necesarias en la Workstation
+REGEX='^[a-z0-9]{12}$'
+ALEMBIC_OP='create_phone_number_col_on_users_table'
+MIGRATION_FILE=''
+REV_ID=''
+
+# Crear revision para la operación descrita en $ALEMBIC_OP
+docker exec -it fastapi bash -c "alembic revision -m ${ALEMBIC_OP}"
+  # Generating /app/alembic/versions/2f0419fc4698_create_phone_number_col_on_users_table.py ...  done
+
+# Modificar archivo de la revision para realizar la operación
+MIGRATION_FILE=$(docker exec fastapi bash -c "ls -1 /app/alembic/versions/ | grep -E '^[a-z0-9]{12}_${ALEMBIC_OP}' | tr -d '\r'")
+
+docker exec -it fastapi bash -c "sed -i '/def upgrade/,\$d' /app/alembic/versions/${MIGRATION_FILE}"
+
+docker exec -it fastapi bash -c "
+  tee -a /app/alembic/versions/${MIGRATION_FILE} << EOF
+def upgrade() -> None:
+    op.add_column('users',sa.Column('phone_number',sa.String(),nullable=True))
+
+def downgrade() -> None:
+    op.drop_column('users','phone_number')
+EOF
+"
+
+# Aplicar revision
+REV_ID=$(docker exec fastapi bash -c "grep 'Revision ID' /app/alembic/versions/*table.py | awk -F ': ' '{print \$2}' | tr -d '\r' | sed 's/[[:space:]]\+$//'")
+
+docker exec -it fastapi bash -c "alembic upgrade ${REV_ID}"
+  # INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+  # INFO  [alembic.runtime.migration] Will assume transactional DDL.
+  # INFO  [alembic.runtime.migration] Running upgrade  -> 2f0419fc4698, create_phone_number_col_on_users_table
+```
+```bash
+# Verificar
+docker exec -it postgresql psql -U fastapi -d fastapi -c "select * from users;"
+  #  id |      email      | username | first_name | last_name |                       hashed_password                        | is_active | role  | phone_number
+  # ----+-----------------+----------+------------+-----------+--------------------------------------------------------------+-----------+-------+--------------
+  #   1 | foo@example.com | foo      | foo        | example   | $2b$12$hevQQk73MbsOt5AG7Ofe7OZ6FWsp9Xwz8gh048fkK06ZuwS1lJ1DW | t         | admin |
+  #   2 | bar@example.com | bar      | bar        | example   | $2b$12$TFlZ99l/WK/hIhJHJPajk.GuloOgrntRwQ2SDmnu2shD4bPy7qXVq | t         |       |
+  # (2 rows)
+```
+
+6. Finalmente, modificamos [src/models.py](/03-todos-database/src/models.py) para añadir el phone_number a la clase al modelo de datos
+
+```py
+class Users(Base):
+    # ...
+    phone_number=Column(String)
+```
+
+```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:5012/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:5012/user/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"first_name":"foo","last_name":"example","is_active":true,"phone_number":null,"username":"foo","email":"foo@example.com","id":1,"hashed_password":"$2b$12$hevQQk73MbsOt5AG7Ofe7OZ6FWsp9Xwz8gh048fkK06ZuwS1lJ1DW","role":"admin"}%
+```
+
+#### 3. Alembic Downgrade
+
+Deshacer el cambio (columna phone_number en tabla users)
+
+```bash
+docker exec -it fastapi bash -c "alembic downgrade -1"
+  # INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+  # INFO  [alembic.runtime.migration] Will assume transactional DDL.
+  # INFO  [alembic.runtime.migration] Running downgrade 6dc9f804172b -> , create_phone_number_col_on_users_table
+
+curl -X 'GET' \
+  'http://localhost:5012/user/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # Internal Server Error%
+
+sed -i '/phone_number/s/^/# /' ./src/models.py
+
+curl -X 'GET' \
+  'http://localhost:5012/user/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"last_name":"example","id":1,"first_name":"foo","is_active":true,"username":"foo","email":"foo@example.com","hashed_password":"$2b$12$hevQQk73MbsOt5AG7Ofe7OZ6FWsp9Xwz8gh048fkK06ZuwS1lJ1DW","role":"admin"}%
+
+```
+
+#### 4. Alembic Assignment
+
+```md
+- Add a phone number field as required when we create a new user within our auth.py file
+- Create a new @put request in our users.py file that allows a user to update their phone_number
+```
+
+Modificar el `auth.py` y el `users.py`
+
+```py
+# src/routers/auth.py
+
+class CreateUserRequest(BaseModel):
+    # ...
+    phone_number:str
+
+@router.post("/",status_code=status.HTTP_201_CREATED)
+    # ...
+        phone_number=create_user_request.phone_number
+```
+```py
+# src/routers/users.py
+
+@router.put("/phonenumber/{phone_number}",status_code=status.HTTP_204_NO_CONTENT)
+async def change_phonenumber(user:user_dependency,db:db_dependency,
+                             phone_number: str):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    user_model=db.query(Users).filter(Users.id == user.get('id')).first()
+    user_model.phone_number=phone_number
+    db.add(user_model)
+    db.commit()
+```
+
+```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:5012/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+)
+
+curl -X 'PUT' \
+  'http://localhost:5012/user/phonenumber/123456789' \
+  -H 'accept: */*' \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -X 'GET' \
+  'http://localhost:5012/user/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"last_name":"example","first_name":"foo","is_active":true,"phone_number":"123456789","username":"foo","email":"foo@example.com","id":1,"hashed_password":"$2b$12$hevQQk73MbsOt5AG7Ofe7OZ6FWsp9Xwz8gh048fkK06ZuwS1lJ1DW","role":"admin"}%
+
+docker exec -it postgresql psql -U fastapi -d fastapi -c "select email,phone_number from users;"
+  #       email      | phone_number
+  # -----------------+--------------
+  #  bar@example.com |
+  #  foo@example.com | 123456789
+  # (2 rows)
+```
 
 
 
@@ -4024,9 +4269,6 @@ pip install python-dotenv
 
 ---
 
-
-
-## 13. Project 3.5 - [Alembic](https://alembic.sqlalchemy.org/en/latest/) Data Migration
 ## 14. Project 4 - Unit & Integration Testing
 ## 15. Project 5 - Full Stack Application
 ## 16. Git - Version Control
