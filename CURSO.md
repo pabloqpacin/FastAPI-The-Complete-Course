@@ -4015,8 +4015,7 @@ pgAdmin:
 
 ## 13. (7.6) ~~Project 3.5~~ - [Alembic](https://alembic.sqlalchemy.org/en/latest/) Data Migration
 
-<!-- <details> -->
-
+<details>
 
 #### 1. Alembic Overview
 
@@ -4204,11 +4203,6 @@ curl -X 'GET' \
 
 ```
 
-
-
----
-
-
 #### 4. Alembic Assignment
 
 ```md
@@ -4216,7 +4210,58 @@ curl -X 'GET' \
 - Create a new @put request in our users.py file that allows a user to update their phone_number
 ```
 
-...
+Modificar el `auth.py` y el `users.py`
+
+```py
+# src/routers/auth.py
+
+class CreateUserRequest(BaseModel):
+    # ...
+    phone_number:str
+
+@router.post("/",status_code=status.HTTP_201_CREATED)
+    # ...
+        phone_number=create_user_request.phone_number
+```
+```py
+# src/routers/users.py
+
+@router.put("/phonenumber/{phone_number}",status_code=status.HTTP_204_NO_CONTENT)
+async def change_phonenumber(user:user_dependency,db:db_dependency,
+                             phone_number: str):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    user_model=db.query(Users).filter(Users.id == user.get('id')).first()
+    user_model.phone_number=phone_number
+    db.add(user_model)
+    db.commit()
+```
+
+```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:5012/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+)
+
+curl -X 'PUT' \
+  'http://localhost:5012/user/phonenumber/123456789' \
+  -H 'accept: */*' \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -X 'GET' \
+  'http://localhost:5012/user/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"last_name":"example","first_name":"foo","is_active":true,"phone_number":"123456789","username":"foo","email":"foo@example.com","id":1,"hashed_password":"$2b$12$hevQQk73MbsOt5AG7Ofe7OZ6FWsp9Xwz8gh048fkK06ZuwS1lJ1DW","role":"admin"}%
+
+docker exec -it postgresql psql -U fastapi -d fastapi -c "select email,phone_number from users;"
+  #       email      | phone_number
+  # -----------------+--------------
+  #  bar@example.com |
+  #  foo@example.com | 123456789
+  # (2 rows)
+```
 
 
 
