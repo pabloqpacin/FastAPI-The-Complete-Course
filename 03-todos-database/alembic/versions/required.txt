@@ -1,0 +1,1 @@
+Required to COPY to the directory alembic/versions/ to the Docker image

@@ -13,7 +13,7 @@ services:
       - ./.env.development
     # Para prod., comentar el volumen y montar la app/ en la imagen (Dockerfile)
     volumes:
-      - ./app:/app
+      - ./src:/app/src
     restart: unless-stopped
     depends_on:
       postgresql:
