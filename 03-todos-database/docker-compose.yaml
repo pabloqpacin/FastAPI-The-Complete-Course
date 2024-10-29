@@ -1,0 +1,68 @@
+# name: FastAPI
+
+services:
+
+  fastapi:
+    build:
+      context: .
+    # hostname: fastapi
+    container_name: fastapi
+    ports:
+      - "5012:80"
+    env_file:
+      - ./.env.development
+    # Para prod., comentar el volumen y montar la app/ en la imagen (Dockerfile)
+    volumes:
+      - ./app:/app
+    restart: unless-stopped
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+  postgresql:
+    image: postgres:16.1-alpine
+    container_name: postgresql
+    # Descomentar el puerto para conectarnos con pgadmin, dbeaver o lo que sea (fastapi usa 5432)
+    # ports:
+    #   - "5010:5432"
+    env_file:
+      - ./.env.development
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+      - ./db/fastapi_todos.sql:/docker-entrypoint-initdb.d/fastapi_todos.sql:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fastapi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # pgadmin:
+  #   image: dpage/pgadmin4:8.12
+  #   container_name: pgadmin
+  #   restart: always
+  #   ports:
+  #     - "5011:80"
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: poc@setenova.es
+  #     PGADMIN_DEFAULT_PASSWORD: USd3Fiv2,tJ,b[H\2r{
+  #   volumes:
+  #     - pgadmin_data:/var/lib/pgadmin
+
+volumes:
+  postgresql_data:
+  # pgadmin_data:
+
+
+# ---
+# https://medium.com/@vishal.sharma./run-postgresql-and-pgadmin-using-docker-compose-34120618bcf9
+
+# xdg-open localhost:8888 > Login > poc@setenova.es==USd3Fiv2,tJ,b[H\2r{
+#   add new server:
+#     Name==FastAPI
+#     Hostname==postgresql
+#     Username==fastapi
+#     Password==s_clpa59Bs?D]BP<AgI
+#     save_password==true
+
+# TODO: integrar con vault.setenova.es para las contras

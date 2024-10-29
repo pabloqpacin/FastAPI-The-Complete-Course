@@ -58,11 +58,46 @@
       - [14. HTTP Exceptions](#14-http-exceptions)
       - [15. Explicit Status Code Responses](#15-explicit-status-code-responses)
   - [7. Project 3 - Complete RESTful APIs](#7-project-3---complete-restful-apis)
-  - [8. Setup Database](#8-setup-database)
-  - [9. API Request Methods](#9-api-request-methods)
-  - [10. Authentication \& Authorization (JWT)](#10-authentication--authorization-jwt)
-  - [11. Authenticate Requests](#11-authenticate-requests)
-  - [12. Large Production Database Setup](#12-large-production-database-setup)
+  - [8. (7.1) Setup Database ](#8-71-setup-database-)
+      - [1. Intro](#1-intro-1)
+      - [2. DB Connection with ORM SQLAlchemy](#2-db-connection-with-orm-sqlalchemy)
+      - [3. DB Tables (Models)](#3-db-tables-models)
+      - [4. main: DB Conn. for API \& init](#4-main-db-conn-for-api--init)
+      - [5. SQLite3 Installation](#5-sqlite3-installation)
+      - [6. SQL Queries Crash-Course](#6-sql-queries-crash-course)
+      - [7. SQLite3 Setup: TODOs](#7-sqlite3-setup-todos)
+  - [9. (7.2) API Request CRUD Methods](#9-72-api-request-crud-methods)
+      - [1. GET All Todos from DB](#1-get-all-todos-from-db)
+      - [2. GET Todo by ID](#2-get-todo-by-id)
+      - [3. POST Request](#3-post-request)
+      - [4. PUT Request](#4-put-request)
+      - [5. DELETE Request](#5-delete-request)
+  - [10. (7.3) Authentication \& Authorization (JWT)](#10-73-authentication--authorization-jwt)
+      - [1. Routers: todos.py \& auth.py](#1-routers-todospy--authpy)
+      - [2. One-To-Many Relationship (mind FKs)](#2-one-to-many-relationship-mind-fks)
+      - [3. Rename SQLite DB, create Users table, add FK to Todos table](#3-rename-sqlite-db-create-users-table-add-fk-to-todos-table)
+      - [4. create\_users endpoint, hashed passwords (*passlib* + *bcrypt*)](#4-create_users-endpoint-hashed-passwords-passlib--bcrypt)
+      - [5. Save User to DB](#5-save-user-to-db)
+      - [6. Authenticate User (`python-multipart` + `OAuth2PasswordRequestForm`)](#6-authenticate-user-python-multipart--oauth2passwordrequestform)
+      - [7. JSON Web Token (JWT) Overview](#7-json-web-token-jwt-overview)
+      - [8. Encode a JWT](#8-encode-a-jwt)
+      - [9. Decode a JWT](#9-decode-a-jwt)
+      - [10. Authentication Enhancements](#10-authentication-enhancements)
+  - [11. (7.4) Authenticate Requests](#11-74-authenticate-requests)
+      - [0. CUSTOM: tweak `auth.py` for authentication with `curl`](#0-custom-tweak-authpy-for-authentication-with-curl)
+      - [1. POST Todo (user\_id)](#1-post-todo-user_id)
+      - [2. GET all Todos (user\_id)](#2-get-all-todos-user_id)
+      - [3. GET Todo (id + user\_id)](#3-get-todo-id--user_id)
+      - [4. PUT Todo (user\_id)](#4-put-todo-user_id)
+      - [5. DELETE Todo (user\_id)](#5-delete-todo-user_id)
+      - [6. Admin Router](#6-admin-router)
+      - [7. Assignment](#7-assignment)
+  - [12. (7.5) Dockerized FastAPI with ~~MySQL~~ PostgreSQL (~~Large Production Database Setup~~)](#12-75-dockerized-fastapi-with-mysql-postgresql-large-production-database-setup)
+    - [I. Dockerizar FastAPI](#i-dockerizar-fastapi)
+    - [II. Implantar stack y verificar FastAPI requests](#ii-implantar-stack-y-verificar-fastapi-requests)
+    - [III. pgAdmin (opcional)](#iii-pgadmin-opcional)
+    - [IV. MySQL (UNDONE)](#iv-mysql-undone)
+- [TEMA DOTENV](#tema-dotenv)
   - [13. Project 3.5 - Alembic Data Migration](#13-project-35---alembic-data-migration)
   - [14. Project 4 - Unit \& Integration Testing](#14-project-4---unit--integration-testing)
   - [15. Project 5 - Full Stack Application](#15-project-5---full-stack-application)
@@ -94,7 +129,7 @@ python3 --version && python3 -c 'print("Hello World!")'
   # Python 3.10.12
   # Hello World!
 
-python3 -m pip --version  # && pip install pip-autoremove -y
+python3 -m pip --version  # && pip install isort pip-autoremove -y
   # pip 22.0.2 from /home/pabloqpacin/repos/FastAPI-The-Complete-Course/.venv/lib/python3.10/site-packages/pip (python 3.10)
 
 # ---
@@ -1557,7 +1592,7 @@ uvicorn --version
 
 cd ./01-books-requests
 
-uvicorn books:app --reload || \
+# uvicorn books:app --reload || \
 fastapi dev books.py || \
 fastapi run books.py
 
@@ -2227,14 +2262,1771 @@ curl -v -X 'DELETE' \
 
 </details>
 
+---
 
 ## 7. Project 3 - Complete RESTful APIs
-## 8. Setup Database
-## 9. API Request Methods
-## 10. Authentication & Authorization (JWT)
-## 11. Authenticate Requests
-## 12. Large Production Database Setup
-## 13. Project 3.5 - Alembic Data Migration
+
+- Content 1/2:
+  - full SQL Database: SQLite, PostreSQL & MySQL (WIP: Dockerized!!!!)
+  - Authentication: create usernames+passwords (JWT)
+  - Authorization: roles/permissions for endpoints
+  - Hashing Passwords
+- Content 2/2:
+  - TODOS instead of BOOKS
+  - create new TODO Table Model for the application
+  - using TODOs to save records throughout the project
+
+```mermaid
+flowchart LR;
+
+Webpage -. auth .-> FastAPI
+FastAPI -. fetch users & save TODOs .-> Database
+```
+
+---
+
+## 8. (7.1) Setup Database <!--(*Dockerized* PostgreSQL)-->
+
+<details>
+
+<!-- > db mysql - https://github.com/pabloqpacin/proyecto_lemp_compose/blob/main/compose.yaml -->
+
+
+#### 1. Intro
+
+- **Database**: easily accessible, modifiable, controlled and organized; atm we use SQL
+- **Data**: info related to objects (eg. user: name,age,email,password)
+- **Database Management Systems (DBMS)**: SQLite, MySQL, PostreSQL
+- **SQL**: relational DBs with tables etc.
+- ~~**Usecase**: store, retrieve and modify data~~
+
+
+#### 2. DB Connection with ORM SQLAlchemy
+
+- Instalar [SQLAlchemy](https://www.sqlalchemy.org/) en el `.venv`
+
+```bash
+# source .venv/bin/activate
+
+pip install sqlalchemy
+  # ...
+  # Successfully installed greenlet-3.1.1 sqlalchemy-2.0.36
+```
+
+- Crear [./database.py](/03-todos-database/database.py)
+<!-- # Create a session local ~~(will be object)~~, and each instance will have its own session -->
+
+```py
+# database.py
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+
+SQLALCHEMY_DATABASE_URL='sqlite:///./todos.db'
+
+# SQLite only allows one thread per request by default to prevent accidents sharing a connection with multiple requests, but it's common to have many threads interacting with the DB... therefore we have SQLite not check the same thread because there could be many
+engine = create_engine(SQLALCHEMY_DATABASE_URL,connect_args={'check_same_thread':False})
+
+SessionLocal = sessionmaker(autocommit=False,autoflush=False,bind=engine)
+
+Base = declarative_base()
+```
+
+#### 3. DB Tables (Models)
+
+- TODO Tables Example (**modelado de datos**)
+
+| ID (PK) | title               | description | priority  | complete
+| ---     | ---                 | ---         | ---       | ---
+| 1       | Go to store         | foo         | 4         | 0
+| 2       | Haircut             | foo         | 3         | 0
+| 3       | Feed dog            | foo         | 5         | 0
+| 4       | Water plant         | foo         | 4         | 0
+| 5       | Learn something new | foo         | 5         | 0
+
+
+- Create [.models.py](/03-todos-database/models.py)
+
+```py
+# models.py
+
+from database import Base
+from sqlalchemy import Column,Integer,String,Boolean
+
+# Table
+class Todos(Base):
+    __tablename__='todos'
+    
+    id=Column(Integer,primary_key=True,index=True)
+    title=Column(String)
+    description=Column(String)
+    priority=Column(Integer)
+    complete=Column(Boolean,default=False)
+```
+
+#### 4. main: DB Conn. for API & init
+
+```py
+# main.py
+
+from fastapi import FastAPI
+from database import engine
+import models
+
+
+app = FastAPI()
+
+models.Base.metadata.create_all(bind=engine)
+```
+```bash
+# cd 03-todos-database
+
+fastapi dev main.py || \
+uvicorn main:app --reload
+
+file ./todos.db
+  # todos.db: SQLite 3.x database, last written using SQLite version 3037002, file counter 2, database pages 3, cookie 0x2, schema 4, UTF-8, version-valid-for 2
+```
+
+#### 5. SQLite3 Installation
+ 
+```bash
+# docker compose up ... || \
+# docker run ... || \
+
+sudo apt install sqlite -y
+  # 3 pkgs
+```
+
+#### 6. SQL Queries Crash-Course
+
+Ejemplos de SQL...
+
+```sql
+-- Insert data
+insert into todos (title,description,priority,complete) values (
+  'Go to store','foo',4,False
+);
+
+-- Select data
+select * from todos where priority=5;
+
+select title,description,priority from todos
+  where complete=False
+;
+
+-- Update data
+update todos set complete=True where id=5;
+
+-- Delete data
+delete from todos where complete=False;
+delete from todos where id=5;
+```
+
+#### 7. SQLite3 Setup: TODOs
+
+```bash
+sqlite3 todos.db ".schema"
+  # CREATE TABLE todos (
+  #         id INTEGER NOT NULL,
+  #         title VARCHAR,
+  #         description VARCHAR,
+  #         priority INTEGER,
+  #         complete BOOLEAN,
+  #         PRIMARY KEY (id)
+  # );
+  # CREATE INDEX ix_todos_id ON todos (id);
+
+sqlite3 todos.db "insert into todos (title,description,priority,complete) values
+  ('Go to store','foo',4,False),
+  ('Haircut','foo',3,False),
+  ('Feed dog','foo',5,False),
+  ('Water plant','foo',4,False),
+  ('Learn something new','foo',5,False)
+;"
+
+sqlite3 todos.db "select * from todos;"
+  # 1|Go to store|foo|4|0
+  # 2|Haircut|foo|3|0
+  # 3|Feed dog|foo|5|0
+  # 4|Water plant|foo|4|0
+  # 5|Learn something new|foo|5|0
+
+sqlite3 todos.db { -column || -markdown || -box || -table } "select * from todos;"
+  # ...
+```
+
+
+
+</details>
+
+## 9. (7.2) API Request CRUD Methods
+
+<details>
+
+#### 1. GET All Todos from DB
+
+- Connection via dependency injection
+
+```py
+# main.py
+
+from fastapi import FastAPI, Depends
+from database import engine, SessionLocal
+import models
+from models import Todos
+from typing import Annotated
+from sqlalchemy.orm import Session
+
+app = FastAPI()
+
+models.Base.metadata.create_all(bind=engine)
+
+# ---
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+db_dependency=Annotated[Session,Depends(get_db)]
+
+@app.get("/")
+async def read_all(db:db_dependency):
+    return db.query(Todos).all()
+```
+```bash
+curl http://localhost:8000/
+  # [{"description":"foo","complete":false,"id":1,"priority":4,"title":"Go to store"},{"description":"foo","complete":false,"id":2,"priority":3,"title":"Haircut"},{"description":"foo","complete":false,"id":3,"priority":5,"title":"Feed dog"},{"description":"foo","complete":false,"id":4,"priority":4,"title":"Water plant"},{"description":"foo","complete":false,"id":5,"priority":5,"title":"Learn something new"}]%
+```
+
+#### 2. GET Todo by ID
+
+```py
+from fastapi import FastAPI, Depends, HTTPException, Path
+from starlette import status
+
+@app.get("/todo/{todo_id}",status_code=status.HTTP_200_OK)
+async def read_todo(db:db_dependency,todo_id:int =Path(gt=0)):
+    todo_model = db.query(Todos).filter(Todos.id == todo_id).first()
+    if todo_model is not None:
+        return todo_model
+    raise HTTPException(status_code=404,detail='Todo not found.')
+```
+```bash
+curl http://localhost:8000/todo/2
+  # {"title":"Haircut","priority":3,"description":"foo","id":2,"complete":false}%
+
+curl http://localhost:8000/todo/22
+  # {"detail":"Todo not found."}%
+
+curl http://localhost:8000/todo/-2
+  # {"detail":[{"type":"greater_than","loc":["path","todo_id"],"msg":"Input should be greater than 0","input":"-2","ctx":{"gt":0}}]}%
+```
+
+#### 3. POST Request
+
+- We don't pass ID in the Request
+
+```py
+from pydantic import BaseModel, Field
+
+class TodoRequest(BaseModel):
+    title:str =Field(min_length=3)
+    description:str =Field(min_length=3,max_length=100)
+    priority:int =Field(gt=0,lt=6)
+    complete:bool
+
+@app.post("/todo",status_code=status.HTTP_201_CREATED)
+async def create_todo(db:db_dependency,todo_request:TodoRequest):
+    todo_model = Todos(**todo_request.model_dump())
+    db.add(todo_model)
+    db.commit()
+```
+```bash
+curl localhost:8000
+  # [{"description":"foo","id":1,"complete":false,"priority":4,"title":"Go to store"},{"description":"foo","id":2,"complete":false,"priority":3,"title":"Haircut"},{"description":"foo","id":3,"complete":false,"priority":5,"title":"Feed dog"},{"description":"foo","id":4,"complete":false,"priority":4,"title":"Water plant"},{"description":"foo","id":5,"complete":false,"priority":5,"title":"Learn something new"}]%
+
+curl -X 'POST' \
+  'http://localhost:8000/todo' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "title": "Learn FastAPI",
+  "description": "bar",
+  "priority": 4,
+  "complete": false
+}'
+  # null%
+
+curl localhost:8000
+  # [{"description":"foo","id":1,"complete":false,"priority":4,"title":"Go to store"},{"description":"foo","id":2,"complete":false,"priority":3,"title":"Haircut"},{"description":"foo","id":3,"complete":false,"priority":5,"title":"Feed dog"},{"description":"foo","id":4,"complete":false,"priority":4,"title":"Water plant"},{"description":"foo","id":5,"complete":false,"priority":5,"title":"Learn something new"},{"description":"bar","id":6,"complete":false,"priority":4,"title":"Learn FastAPI"}]%
+```
+
+#### 4. PUT Request
+
+```py
+@app.put("/todo/{todo_id}",status_code=status.HTTP_204_NO_CONTENT)
+async def update_todo(db:db_dependency,
+                      todo_request:TodoRequest,
+                      todo_id:int =Path(gt=0)):
+    todo_model = db.query(Todos).filter(Todos.id == todo_id).first()
+    if todo_model is None:
+        raise HTTPException(status_code=404,detail='Todo not found.')
+    
+    todo_model.title=todo_request.title
+    todo_model.description=todo_request.description
+    todo_model.priority=todo_request.priority
+    todo_model.complete=todo_request.complete
+
+    db.add(todo_model)
+    db.commit()
+```
+```bash
+curl localhost:8000/todo/3
+  # {"description":"foo","complete":false,"id":3,"priority":5,"title":"Feed dog"}%
+
+curl -X 'PUT' \
+  'http://localhost:8000/todo/3' \
+  -H 'accept: */*' \
+  -H 'Content-Type: application/json' \
+  -d '{"description":"foo","complete":false,"priority":5,"title":"Feed cat"}'
+
+curl localhost:8000/todo/3
+  # {"description":"foo","complete":false,"id":3,"priority":5,"title":"Feed cat"}%
+```
+
+#### 5. DELETE Request
+
+```py
+@app.delete("/todo/{todo_id}",status_code=status.HTTP_204_NO_CONTENT)
+async def delete_todo(db:db_dependency,todo_id:int =Path(gt=0)):
+    todo_model = db.query(Todos).filter(Todos.id == todo_id).first()
+    if todo_model is None:
+        raise HTTPException(status_code=404,detail='Todo not found.')
+    db.query(Todos).filter(Todos.id == todo_id).delete()
+    db.commit()
+```
+```bash
+curl localhost:8000/todo/2
+  # {"description":"foo","complete":false,"id":2,"priority":3,"title":"Haircut"}%
+
+curl -X 'DELETE' \
+  'http://localhost:8000/todo/2' \
+  -H 'accept: */*'
+
+curl localhost:8000/todo/2
+  # {"detail":"Todo not found."}%
+```
+
+
+</details>
+
+
+
+## 10. (7.3) Authentication & Authorization (JWT)
+
+<!-- AUTOPOPULATE SQLITE!?!?! -->
+
+> - For each API request, a user will have their ID attached via JWT
+> - Thus we can validate the JWT to use the ID and return any todos relevant to the FK!!
+
+<details>
+
+
+#### 1. Routers: todos.py & auth.py
+
+- **routers**: a way to have our main file (root of our app) interact with other API files/endpoints...
+- create [./routers/todos.py](/03-todos-database/routers/todos.py) for [./main.py](/03-todos-database/main.py)'s Todos logic (*refactor*), and create [./routers/auth.py](/03-todos-database/routers/auth.py) (verificar endpoints en Swagger)
+
+
+```py
+# main.py
+
+from fastapi import FastAPI
+from database import engine
+import models
+from routers import auth, todos
+
+
+app = FastAPI()
+
+models.Base.metadata.create_all(bind=engine)
+
+app.include_router(auth.router)
+app.include_router(todos.router)
+```
+```py
+# routers/todos.py
+
+# ...
+```
+```py
+# routers/auth.py
+
+from fastapi import APIRouter
+
+router = APIRouter()
+
+# ---
+
+@router.get("/auth/")
+async def get_user():
+    return {'user':'authenticated'}
+```
+
+#### 2. One-To-Many Relationship (mind FKs)
+
+- example Users table
+
+| ID (PK) | email           | username  | first_name  | last_name | hashed_password | is_active
+| ---     | ---             | ---       | ---         | ---       | ---             | ---
+| 1       | foo@example.com | foo       | foo         | example   | 123abc          | 1
+| 2       | bar@example.com | bar       | bar         | example   | 123xyz          | 1
+
+- relationship users ~ todos
+  - 1 user > n todos
+  - 1 todo > 1 user
+
+```mermaid
+erDiagram
+
+user ||--o{ todo : has
+user{
+  int id PK
+  str email
+  str username
+  str first_name
+  str last_name
+  str hashed_password
+  bool is_active
+  str role
+}
+todo {
+  int id PK
+  str title
+  str description
+  int priority
+  bool complete
+  int owner FK
+}
+```
+
+- **FK**: column in a table that references a PK on a second table to establish a link
+  - we'll get associate each request with a user id via JWT, and retrieve relevant todos based on their FK
+
+
+#### 3. Rename SQLite DB, create Users table, add FK to Todos table
+
+> [!IMPORTANT]
+> Later on, we'll use Alembic to 'enhance/populate' tables (SQLAlchemy can only create'em)
+
+- rename our SQLite DB from `todos.db` to `todosapp.db` at [./database.py](/03-todos-database/database.py)
+- at [./models.py](/03-todos-database/models.py), create new `users` table and add FK to `todos` table
+
+```py
+# database.py
+
+SQLALCHEMY_DATABASE_URL='sqlite:///./todosapp.db'
+```
+```py
+# models.py
+
+from database import Base
+from sqlalchemy import Column,Integer,String,Boolean,ForeignKey
+
+# Table
+class Users(Base):
+    __tablename__='users'
+
+    id=Column(Integer,primary_key=True,index=True)
+    email=Column(String,unique=True)
+    username=Column(String,unique=True)
+    first_name=Column(String)
+    last_name=Column(String)
+    hashed_password=Column(String)
+    is_active=Column(Boolean,default=True)
+    role=Column(String)
+
+# Table
+class Todos(Base):
+    __tablename__='todos'
+    # ...
+    owner_id=Column(Integer,ForeignKey("users.id"))
+```
+
+#### 4. create_users endpoint, hashed passwords (*passlib* + *bcrypt*)
+
+> [!CAUTION]
+> Passlib requires a deprecated version of Bcrypt, hence we should not use passlib ([src](https://github.com/pyca/bcrypt/issues/684#issuecomment-1902590553))
+
+- Install passlib and bcrypt ~~([src](https://passlib.readthedocs.io/en/stable/install.html))~~
+
+```bash
+# source .venv/bin/activate
+
+# pip install "passlib[bcrypt]" || \
+pip install passlib
+pip install bcrypt==4.0.1
+
+# pip list | wc -l
+#   # 42
+```
+<!--
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/home/pabloqpacin/repos/FastAPI-The-Complete-Course/.venv/lib/python3.10/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+AttributeError: module 'bcrypt' has no attribute '__about__'
+
+https://github.com/pyca/bcrypt/issues/684#issuecomment-1902590553
+...
+-->
+
+- Update [./routers/auth.py](/03-todos-database/routers/auth.py) for a `create_user` endpoint!
+
+```py
+from fastapi import APIRouter
+from pydantic import BaseModel
+from models import Users
+from passlib.context import CryptContext
+
+router = APIRouter()
+
+bcrypt_context = CryptContext(schemes=['bcrypt'],deprecated='auto')
+
+class CreateUserRequest(BaseModel):
+    username:str
+    email:str
+    first_name:str
+    last_name:str
+    password:str
+    role:str
+
+# ---
+
+@router.post("/auth")
+async def create_user(create_user_request:CreateUserRequest,):
+    # create_user_model = Users(**create_user_request.model_dump()) # won't work bc password, not hashed_password
+    create_user_model = Users(
+        username=create_user_request.username,
+        email=create_user_request.email,
+        first_name=create_user_request.first_name,
+        last_name=create_user_request.last_name,
+        hashed_password=bcrypt_context.hash(create_user_request.password),
+        role=create_user_request.role,
+        is_active=True
+    )
+    return create_user_model
+```
+
+```bash
+curl -X 'POST' \
+  'http://localhost:8000/auth' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "username": "foo",
+  "email": "foo@example.com",
+  "first_name": "foo",
+  "last_name": "example",
+  "password": "123abc",
+  "role": "admin"
+}'
+  # {"username":"foo","email":"foo@example.com","first_name":"foo","last_name":"example","hashed_password":"$2b$12$2sgedDcNpk6wfBxvEFmQ7ONU41ISa/TJWu55er8RPGO1ID1hqEXEW","role":"admin","is_active":true}%
+```
+
+#### 5. Save User to DB
+
+- modificar [./auth.py](/03-todos-database/routers/auth.py)
+
+```py
+from fastapi import APIRouter, Depends
+from database import SessionLocal
+from typing import Annotated
+from sqlalchemy.orm import Session
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+db_dependency=Annotated[Session,Depends(get_db)]
+```
+```bash
+curl -X 'POST' \
+  'http://localhost:8000/auth' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "username": "foo",
+  "email": "foo@example.com",
+  "first_name": "foo",
+  "last_name": "example",
+  "password": "123abc",
+  "role": "admin"
+}'
+  # null%
+
+sqlite3 todosapp.db "select * from users;"
+  # 1|foo@example.com|foo|foo|example|$2b$12$7FEvQoIB77yV7vAFlAYYIOia5MI7nFjMzorsIJSC5NoT.r526w2SC|1|admin
+```
+
+#### 6. Authenticate User (`python-multipart` + `OAuth2PasswordRequestForm`)
+
+- Instalar [python-multipart](https://multipart.fastapiexpert.com/) (en el `.venv`) si no está instalado (debería)
+
+```bash
+# source .venv/bin/activate
+
+if ! pip list | grep 'python-multipart'; then
+  pip install python-multipart
+fi
+```
+
+- Edit `auth.py` to fill **a user-pass form in Swagger** (or just use proper `curl`)
+
+```py
+# routers/auth.py
+
+from fastapi.security import OAuth2PasswordRequestForm
+
+def authenticate_user(username:str,password:str,db):
+    user = db.query(Users).filter(Users.username == username).first()
+    if not user:
+        return False
+    if not bcrypt_context.verify(password,user.hashed_password):
+        return False
+    return user
+
+@router.post("/token")
+async def login_for_access_token(form_data:Annotated[OAuth2PasswordRequestForm,Depends()],
+                                 db:db_dependency):
+    user = authenticate_user(form_data.username,form_data.password,db)
+    if not user:
+        return 'Failed Authentication'
+    return 'Succesful Authentication'
+
+    return form_data.username
+```
+```bash
+curl -X 'POST' \
+  'http://localhost:8000/token' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=password&username=a&password=a&scope=&client_id=&client_secret='
+  # "Failed Authentication"%
+
+curl -X 'POST' \
+  'http://localhost:8000/token' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=password&username=foo&password=123abc&scope=&client_id=&client_secret='
+  # "Succesful Authentication"%
+```
+
+#### 7. JSON Web Token (JWT) Overview
+
+> [Introduction to JSON Web Tokens](https://jwt.io/introduction)
+
+- **JWT**: self-contained way to securely transmit data and information between two parties using a JSON Object; digitally signed therefore trusted by the server; used for Authorization, not Authentication
+- **Process**: user logs in > server returns encoded str JWT; client sends request > authentication > sends JWT for validation (each time)
+- **Structure**: `header.payload.signature`
+  - `header`: two parts `alg` for signing algorithm, `typ` for token type (eg. `{"alg":"HS256","typ":"JWT"}`) encoded using *Base64*
+  - `payload`: actual data aka claims (3 types of claims), also encoded with Base64
+    - *[Registered](https://datatracker.ietf.org/doc/html/rfc7519#section-4.1)*: predefined, recommended but not mandatory (eg. `iss`, `exp` about 1h, `sub` as if ID)
+    - *Public*
+    - *Private*
+  - `signature`: is created using the `alg` in the header to hash out the encoder header, encoded payload and a secret (...)
+- Example:
+
+
+```json
+// JWT Header
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}
+```
+
+```json
+// JWT Payload
+{
+  "sub": "1234567890",
+  "username": "foo",
+  "email": "foo@example.com"
+}
+```
+```ts
+HMACSHA256(
+  base64UrlEncode(header) + "." +
+  base64UrlEncode(payload),
+  secret
+)
+```
+```ts
+// JSON Web Token
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+```
+
+- **Outcome**: unique JSON Web Token string based on the authentication, sent by the requester in the authorization header using the [bearer schema](https://swagger.io/docs/specification/v3_0/authentication/bearer-authentication/) (different than the basic authentication...)
+- **Ojo**: never send anything back to the client; JWT is safe as long as client doesn't know the secret key
+- **Usecase**: two apps (same provider) share the same secret, so two servers can handle decoding and authorization
+
+> CLEARLY RELEVANT FOR **MICROSERVICES**
+
+#### 8. Encode a JWT
+
+<!-- 
+> [!TIP]
+> Está [jwt.io](https://jwt.io/) pero vamos a usar [jwt-cli](https://github.com/mike-engel/jwt-cli) para automatizar y tal
+> ```
+> cargo install jwt-cli
+ -->
+
+- **objective**: return JWT if `login_for_access_token` is successful
+- install [python-jose](https://pypi.org/project/python-jose/)
+
+```bash
+pip install "python-jose[cryptography]"
+  # Successfully installed cffi-1.17.1 cryptography-43.0.3 ecdsa-0.19.0 pyasn1-0.6.1 pycparser-2.22 python-jose-3.3.0 rsa-4.9 six-1.16.0
+```
+
+- tweak `auth.py`
+
+```py
+from datetime import timedelta
+from jose import jwt
+
+    # openssl rand -hex 32
+SECRET_KEY='a3f34163c39774c189289aacc2629768423f54a0fe55c8058714b3c976ca984a'
+ALGORITHM='HS256'
+
+class Token(BaseModel):
+    access_token:str
+    token_type:str
+
+def create_access_token(username:str,user_id:int,expires_delta:timedelta):
+    encode={'sub':username,'id':user_id}
+    expires=datetime.now(timezone.utc)+expires_delta
+    encode.update({'exp':expires})
+    return jwt.encode(encode,SECRET_KEY,algorithm=ALGORITHM)
+
+# ---
+
+@router.post("/token",response_model=Token)
+async def login_for_access_token(form_data:Annotated[OAuth2PasswordRequestForm,Depends()],
+    # ...
+    token = create_access_token(user.username, user.id, timedelta(minutes=20))
+    return {'access_token':token,'token_type':'bearer'}
+```
+```bash
+curl -X 'POST' \
+  'http://localhost:8000/token' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=password&username=a&password=a&scope=&client_id=&client_secret='
+  # "Failed Authentication"%
+
+curl -X 'POST' \
+  'http://localhost:8000/token' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=password&username=foo&password=123abc&scope=&client_id=&client_secret='
+  # {"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmb28iLCJpZCI6MSwiZXhwIjoxNzI5NTQ5MzMyfQ.sPDGxrfsrhkquQ2rMxMys9yg2MU_5Eoon8asLXZ1oFY","token_type":"bearer"}%
+```
+
+- verify with jwt-cli
+
+```bash
+cargo install jwt-cli
+
+BEARER_TOKEN=$(curl -s -X 'POST' \
+  'http://localhost:8000/token' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=password&username=foo&password=123abc&scope=&client_id=&client_secret=' \
+| jq -r '.access_token')
+
+jwt decode $bearer_token
+  #
+  # Token header
+  # ------------
+  # {
+  #   "typ": "JWT",
+  #   "alg": "HS256"
+  # }
+  #
+  # Token claims
+  # ------------
+  # {
+  #   "exp": 1729549524,
+  #   "id": 1,
+  #   "sub": "foo"
+  # }
+```
+
+
+
+#### 9. Decode a JWT
+
+- **Recap**: user logs in with user-pass returning a JWT > verify JWT to authenticate to API endpoints
+
+```py
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import jwt, JWTError
+
+# Verify the token as a dependency in our API requests
+oauth2_bearer = OAuth2PasswordBearer(tokenUrl='token')
+
+async def get_current_user(token:Annotated[str,Depends(oauth2_bearer)]):
+    try:
+        payload=jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
+        username:str=payload.get('sub')
+        user_id:int=payload.get('id')
+        if username is None or user_id is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                detail='Could not validate user.')
+        return {'username':username,'id':user_id}
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail='Could not validate user.')
+```
+
+
+
+#### 10. Authentication Enhancements
+
+- separate endpoints on the Swagger Web UI
+
+```py
+# routers/auth.py
+
+router = APIRouter(
+    prefix="/auth",
+    tags=["auth"]
+)
+
+oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/token')
+
+@router.post("/",status_code=status.HTTP_201_CREATED)
+```
+
+</details>
+
+## 11. (7.4) Authenticate Requests
+
+<details>
+
+> - básicamente modificar [routers/todos.py](/03-todos-database/routers/todos.py) para establecer autenticación
+
+
+#### 0. CUSTOM: tweak `auth.py` for authentication with `curl`
+
+- probarlo en el siguiente apartado de Todos...
+
+```py
+# auth.py
+
+async def get_current_user(token:Annotated[str,Depends(oauth2_bearer)]):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail='Could not validate credentials',
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload=jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
+        username:str=payload.get('sub')
+        user_id:int=payload.get('id')
+        if username is None or user_id is None:
+            raise credentials_exception
+        return {"username":username,"id":user_id}
+    except JWTError:
+        raise credentials_exception
+
+@router.post("/token",response_model=Token)
+async def login_for_access_token(form_data:Annotated[OAuth2PasswordRequestForm,Depends()],
+                                 db:db_dependency):
+    user = authenticate_user(form_data.username,form_data.password,db)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate":"Bearer"},
+        )
+    access_token_expires=timedelta(minutes=20)
+    access_token=create_access_token(user.username,user.id,access_token_expires)
+    return {"access_token":access_token,"token_type":"bearer"}
+```
+
+#### 1. POST Todo (user_id)
+
+> [!TIP]
+> En Swagger, pinchar el icono del candado en POST `/todo` para autenticarse!!
+
+```py
+from .auth import get_current_user
+
+user_dependency=Annotated[dict,Depends(get_current_user)]
+
+@router.post("/todo",status_code=status.HTTP_201_CREATED)
+async def create_todo(user:user_dependency,
+                      db:db_dependency,todo_request:TodoRequest):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    todo_model = Todos(**todo_request.model_dump(),owner_id=user.get('id'))
+    db.add(todo_model)
+    db.commit()
+```
+```bash
+curl -X 'POST' \
+  'http://localhost:8000/todo' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "title": "sup",
+  "description": "dawg",
+  "priority": 1,
+  "complete": true
+}'
+  # {"detail":"Not authenticated"}%
+
+  # Authenticate via Swagger UI
+curl -X 'POST' \
+  'http://localhost:8000/todo' \
+  -H 'accept: application/json' \
+  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmb28iLCJpZCI6MSwiZXhwIjoxNzI5NjIyODU3fQ.fwC5rrX2l2cqfmkrwXOOSziU45R5UYnYWwXPjv6wLCI' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "title": "sup",
+  "description": "dawg",
+  "priority": 1,
+  "complete": true
+}'
+  # null%
+```
+```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+)
+
+curl -X 'POST' \
+  'http://localhost:8000/todo' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "title": "sup",
+  "description": "dawg",
+  "priority": 1,
+  "complete": true
+}'
+  # null%   # 201 Created
+```
+
+#### 2. GET all Todos (user_id)
+
+```py
+@router.get("/")
+async def read_all(user:user_dependency,db:db_dependency):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    return db.query(Todos).filter(Todos.owner_id==user.get('id')).all()
+```
+```bash
+curl -X 'GET' \
+  'http://localhost:8000/' \
+  -H 'accept: application/json'
+  # {"detail":"Not authenticated"}%
+
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:8000/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"priority":1,"title":"sup","description":"dawg","owner_id":1,"id":1,"complete":true},{"priority":1,"title":"sup","description":"dawg","owner_id":1,"id":2,"complete":true},{"priority":1,"title":"sup","description":"dawg","owner_id":1,"id":3,"complete":true}]%
+```
+
+#### 3. GET Todo (id + user_id)
+
+```py
+@router.get("/todo/{todo_id}",status_code=status.HTTP_200_OK)
+async def read_todo(user:user_dependency,db:db_dependency,todo_id:int =Path(gt=0)):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    todo_model = db.query(Todos).filter(Todos.id == todo_id)\
+        .filter(Todos.owner_id==user.get('id')).first()
+    if todo_model is not None:
+        return todo_model
+    raise HTTPException(status_code=404,detail='Todo not found.')
+```
+```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:8000/todo/2' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"description":"dawg","title":"sup","priority":1,"owner_id":1,"id":2,"complete":true}%
+```
+
+#### 4. PUT Todo (user_id)
+
+```py
+@router.put("/todo/{todo_id}",status_code=status.HTTP_204_NO_CONTENT)
+async def update_todo(user:user_dependency,db:db_dependency,
+                      todo_request:TodoRequest,
+                      todo_id:int =Path(gt=0)):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    todo_model = db.query(Todos).filter(Todos.id == todo_id)\
+        .filter(Todos.owner_id==user.get('id')).first()
+    if todo_model is None:
+        raise HTTPException(status_code=404,detail='Todo not found.')
+    # ...
+```
+```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'PUT' \
+  'http://localhost:8000/todo/2' \
+  -H 'accept: */*' \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "title": "sup",
+  "description": "dawg",
+  "priority": 5,
+  "complete": true
+}'
+  # # 204 No Content
+
+curl -X 'GET' \
+  'http://localhost:8000/todo/2' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"description":"dawg","title":"sup","priority":5,"owner_id":1,"id":2,"complete":true}%
+```
+
+#### 5. DELETE Todo (user_id)
+
+```py
+@router.delete("/todo/{todo_id}",status_code=status.HTTP_204_NO_CONTENT)
+async def delete_todo(user:user_dependency,db:db_dependency,todo_id:int =Path(gt=0)):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    todo_model = db.query(Todos).filter(Todos.id == todo_id)\
+        .filter(Todos.owner_id==user.get('id')).first()
+    if todo_model is None:
+        raise HTTPException(status_code=404,detail='Todo not found.')
+    db.query(Todos).filter(Todos.id == todo_id)\
+        .filter(Todos.owner_id==user.get('id')).delete()
+    db.commit()
+```
+```bash
+curl -X 'DELETE' \
+  'http://localhost:8000/todo/2' \
+  -H 'accept: */*' \
+  -H "Authorization: Bearer $TOKEN"
+  # # 204 No Content
+
+curl -X 'GET' \
+  'http://localhost:8000/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"priority":1,"title":"sup","description":"dawg","owner_id":1,"id":1,"complete":true},{"priority":1,"title":"sup","description":"dawg","owner_id":1,"id":3,"complete":true}]%
+```
+
+#### 6. Admin Router
+
+- Crear rol admin para que ciertos usuarios puedan ver todos los Todos etc.
+
+```py
+# routers/auth.py
+
+def create_access_token(username:str,user_id:int,role:str,expires_delta:timedelta):
+    encode={'sub':username,'id':user_id,'role':role}
+
+# async def get_current_user(token:Annotated[str,Depends(oauth2_bearer)]):
+        user_role:str=payload.get('role')
+        return {"username":username,"id":user_id,'user_role':user_role}
+
+# @router.post("/token",response_model=Token)
+    access_token=create_access_token(user.username,user.id,user.role,access_token_expires)
+```
+```py
+# routers/admin.py
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Path
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+from starlette import status
+
+from .auth import get_current_user
+from database import SessionLocal
+from models import Todos
+
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"]
+)
+
+# ---
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+db_dependency=Annotated[Session,Depends(get_db)]
+user_dependency=Annotated[dict,Depends(get_current_user)]
+
+# ---
+
+@router.get("/todo",status_code=status.HTTP_200_OK)
+async def read_all(user:user_dependency,db:db_dependency):
+    if user is None or user.get('user_role') != 'admin':
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    return db.query(Todos).all()
+```
+```py
+# main.py
+from routers import auth, todos, admin
+app.include_router(admin.router)
+```
+
+- Pruebas: tenemos usuario `foo` que es `admin`, creamos usuario `bar` sin rol, creamos un Todo de este nuevo usuario, y luego como ambos usuarios probamos a leer todos los todos (en `/` correspondientes al usuario) y todos los todos del nuevo endpoint `/admin/todo`
+
+```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:8000/admin/todo' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"description":"dawg","title":"sup","priority":1,"owner_id":1,"id":1,"complete":true}]%
+```
+```bash
+curl -X 'POST' \
+  'http://localhost:8000/auth/' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "username": "bar",
+  "email": "bar@example.com",
+  "first_name": "bar",
+  "last_name": "example",
+  "password": "123xyz",
+  "role": ""
+}'
+  # null%
+
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=bar&password=123xyz' \
+  | jq -r .access_token
+) && \
+curl -X 'POST' \
+  'http://localhost:8000/todo' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "title": "bar",
+  "description": "bar",
+  "priority": 1,
+  "complete": false
+}'
+  # null%
+
+curl -X 'GET' \
+  'http://localhost:8000/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"description":"bar","title":"bar","priority":1,"owner_id":2,"id":2,"complete":false}]%
+
+curl -X 'GET' \
+  'http://localhost:8000/admin/todo' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"detail":"Authentication Failed"}%
+
+# ---
+
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:8000/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"description":"dawg","title":"sup","priority":1,"owner_id":1,"id":1,"complete":true}]%
+
+curl -X 'GET' \
+  'http://localhost:8000/admin/todo' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"description":"dawg","title":"sup","priority":1,"owner_id":1,"id":1,"complete":true},{"description":"bar","title":"bar","priority":1,"owner_id":2,"id":2,"complete":false}]%
+```
+
+- Crear y probar otro endpoint para DELETE
+
+```py
+# routers/admin.py
+
+@router.delete("/todo/{todo_id}",status_code=status.HTTP_204_NO_CONTENT)
+async def delete_todo(user:user_dependency,db:db_dependency,todo_id:int =Path(gt=0)):
+    if user is None or user.get('user_role') != 'admin':
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    todo_model = db.query(Todos).filter(Todos.id==todo_id).first()
+    if todo_model is None:
+        raise HTTPException(status_code=404,detail='Todo not found.')
+    db.query(Todos).filter(Todos.id==todo_id).delete()
+    db.commit()
+```
+```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:8000/admin/todo' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"title":"sup","priority":1,"description":"dawg","owner_id":1,"complete":true,"id":1},{"title":"bar","priority":1,"description":"bar","owner_id":2,"complete":false,"id":2}]%
+
+curl -X 'DELETE' \
+  'http://localhost:8000/admin/todo/2' \
+  -H 'accept: */*' \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -X 'GET' \
+  'http://localhost:8000/admin/todo' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # [{"title":"sup","priority":1,"description":"dawg","owner_id":1,"complete":true,"id":1}]%
+```
+
+
+
+#### 7. Assignment
+
+- User provides old_password and new_password, we first need to verify the old_password and then do the update > crear clase *pydantic* `UserVerification(BaseModel)`
+
+```md
+1. Create a new route called Users.
+2. Then create 2 new API Endpoints:
+  - get_user: this endpoint should return all information about the user that is currently logged in.
+  - change_password: this endpoint should allow a user to change their current password.
+```
+
+```py
+# routers/users.py
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Path
+from pydantic import BaseModel, Field
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+from starlette import status
+
+from .auth import get_current_user
+from database import SessionLocal
+from models import Users, Todos
+
+router = APIRouter(
+    prefix="/user",
+    tags=["user"]
+)
+
+# ---
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+db_dependency=Annotated[Session,Depends(get_db)]
+user_dependency=Annotated[dict,Depends(get_current_user)]
+bcrypt_context = CryptContext(schemes=['bcrypt'],deprecated='auto')
+
+class UserVerification(BaseModel):
+    password:str
+    new_password:str =Field(min_length=6)
+
+# ---
+
+@router.get("/",status_code=status.HTTP_200_OK)
+async def get_user(user:user_dependency,db:db_dependency):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    return db.query(Users).filter(Users.id == user.get('id')).first()
+
+# ===== PUT =====
+
+@router.put("/password",status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(user:user_dependency,db:db_dependency,
+                          user_verification:UserVerification):
+    if user is None:
+        raise HTTPException(status_code=401,detail='Authentication Failed')
+    user_model = db.query(Users).filter(Users.id==user.get('id')).first()
+    if not bcrypt_context.verify(user_verification.password,user_model.hashed_password):
+        raise HTTPException(status_code=401,detail='Error on password change')
+    user_model.hashed_password = bcrypt_context.hash(user_verification.new_password)
+    db.add(user_model)
+    db.commit()
+```
+```py
+# main.py
+from routers import auth, admin, users, todos
+app.include_router(users.router)
+```
+
+```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:8000/user/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"username":"foo","last_name":"example","id":1,"is_active":true,"first_name":"foo","email":"foo@example.com","hashed_password":"$2b$12$7FEvQoIB77yV7vAFlAYYIOia5MI7nFjMzorsIJSC5NoT.r526w2SC","role":"admin"}%
+
+curl -X 'PUT' \
+  'http://localhost:8000/user/password' \
+  -H 'accept: */*' \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "password": "123abc",
+  "new_password": "123123"
+}'
+
+TOKEN=$(curl -s -X 'POST' 'http://localhost:8000/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123123' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:8000/user/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"username":"foo","last_name":"example","id":1,"is_active":true,"first_name":"foo","email":"foo@example.com","hashed_password":"$2b$12$udHlG896h8puSb.Gsz64BulGrW74iZAgP.ZaybO6/C1KTl73NeUG2","role":"admin"}%
+```
+
+</details>
+
+---
+
+
+## 12. (7.5) Dockerized FastAPI with ~~MySQL~~ PostgreSQL (~~Large Production Database Setup~~)
+
+<!-- NO MySQL... -->
+
+<!-- https://fastapi.tiangolo.com/deployment/docker/#build-a-docker-image-with-a-single-file-fastapi -->
+
+<details>
+
+> [!IMPORTANT]
+> Podríamos implantar [pgAdmin](https://www.pgadmin.org/docs/pgadmin4/latest/container_deployment.html) tanto en tanto en el server (ver [docker-compose.yaml](/03-todos-database/docker-compose.yaml)) como en nuestra Workstation con otro setup...
+
+- **Objetivos**: implantar una BD relacional (PostgreSQL y MySQL) e implementar CRUD Operations
+- **Objetivos CUSTOM**: Dockerizarlo todo
+- **Diferencias DBMS vs SQLite**: diapositivas 133-... en [../docs/FastAPI_slides.pdf](/docs/FastAPI_slides.pdf)...
+
+
+### I. Dockerizar FastAPI
+
+>  Tareas: `requirements.txt`, `app/`, `Dockerfile`, `.env.example`, `docker-compose.yaml`, `db/fastapi_todos.sql`, `SQLALCHEMY_DATABASE_URL`... 
+
+1. Generamos nuestro [requirements.txt](/03-todos-database/requirements.txt) desde el `.venv` tras instalar una última dependencia ([psycopg2-binary](https://pypi.org/project/psycopg2-binary/))
+
+
+```bash
+# source .venv/bin/activate
+
+pip install psycopg2-binary
+
+pip freeze > 03-todos-database/requirements.txt
+```
+
+2. Nos aseguramos de que el nuevo directorio raíz de nuestra app FastAPI está en un subdirectorio `app/` (luego habrá que modificar el [app/database.py](/03-todos-database/app/database.py))
+
+```bash
+cd 03-todos-database
+
+mkdir app
+git mv routers *.py app/
+```
+
+3. Preparamos el [Dockerfile](/03-todos-database/Dockerfile) para la `app/`; entiendo que en prod. deberíamos:
+   - montar los archivos en la imagen,
+   - cambiar el comando `dev` por `run` y
+   - verificar que funciona bien detrás de HAProxy (tema cabeceras y tal)
+
+```Dockerfile
+FROM python:3.12-slim-bullseye
+
+WORKDIR /app
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Descomentar y montar la app aquí en la imagen, no en el contenedor( docker-compose.yaml)
+# COPY ./app .
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+EXPOSE 80
+
+CMD ["fastapi", "dev", "/app/main.py", "--host", "0.0.0.0", "--port", "80"]
+# CMD ["fastapi", "run", "main.py", "--proxy-headers", "--port", "80"]
+```
+
+4. Preparamos el [docker-compose.yaml](/03-todos-database/docker-compose.yaml) con los servicios:
+   - **fastapi**: el puerto para Swagger (`/docs`) pasa de ser el `8000` al `5012`
+   - **postgresql**: usaremos [db/fastapi_todos.sql](/03-todos-database/db/fastapi_todos.sql) para crear las tablas y '*popularlas*'
+   - **pgadmin**: no está implementado pero sí preparado y comentado en el `docker-compose.yaml`, por si luego viniera bien usarlo
+
+```yaml
+services:
+
+  fastapi:
+    build:
+      context: .
+    container_name: fastapi
+    ports:
+      - "5012:80"
+    env_file:
+      - ./.env.development
+    # Para prod., comentar el volumen y montar la app/ en la imagen (Dockerfile)
+    volumes:
+      - ./app:/app
+    restart: unless-stopped
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+  postgresql:
+    image: postgres:16.1-alpine
+    container_name: postgresql
+    # Uncomment the port if we won't connect from outside (fastapi uses 5432 anyways)
+    ports:
+      - "5010:5432"
+    env_file:
+      - ./.env.development
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+      - ./db/fastapi_todos.sql:/docker-entrypoint-initdb.d/fastapi_todos.sql:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fastapi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgresql_data:
+```
+
+
+5. Preparamos el [.env.example](/03-todos-database/.env.example) con las variables necesarias, que luego copiaremos como `.env.development` para darle valor a las variables, archivo que no deberíamos committear por seguridad/privacidad
+
+```bash
+# .env.example
+POSTGRES_DB=''
+POSTGRES_USER=''
+POSTGRES_PASSWORD=''
+```
+
+6. Para la base de datos, preparamos el script [db/fastapi_todos.sql](/03-todos-database/db/fastapi_todos.sql) para crear las tablas necesarias y de paso *populate them*
+
+
+```sql
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+
+-- ===== CREATE TABLES =====
+
+DROP TABLE IF EXISTS users;
+CREATE TABLE users (
+  id SERIAL,
+  email varchar(200) DEFAULT NULL,
+  username varchar(45) DEFAULT NULL,
+  first_name varchar(45) DEFAULT NULL,
+  last_name varchar(45) DEFAULT NULL,
+  hashed_password varchar(200) DEFAULT NULL,
+  is_active boolean DEFAULT NULL,
+  role varchar(45) DEFAULT NULL,
+  PRIMARY KEY (id)
+);
+
+DROP TABLE IF EXISTS todos;
+CREATE TABLE todos (
+  id SERIAL,
+  title varchar(200) DEFAULT NULL,
+  description varchar(200) DEFAULT NULL,
+  priority integer DEFAULT NULL,
+  complete boolean DEFAULT NULL,
+  owner_id integer DEFAULT NULL,
+  PRIMARY KEY (id),
+  FOREIGN KEY (owner_id) REFERENCES users(id)
+);
+
+-- ===== POPULATE TABLES =====
+
+/* Credenciales: foo==123abc; bar==123xyz */
+INSERT INTO users (email, username, first_name, last_name, hashed_password, is_active, role) VALUES
+-- ( 'foo@example.com', 'foo', 'foo', 'example', crypt('123abc', gen_salt('bf')), TRUE, 'admin'),
+  ( 'foo@example.com', 'foo', 'foo', 'example', '$2b$12$hevQQk73MbsOt5AG7Ofe7OZ6FWsp9Xwz8gh048fkK06ZuwS1lJ1DW', TRUE, 'admin'),
+  ( 'bar@example.com', 'bar', 'bar', 'example', '$2b$12$TFlZ99l/WK/hIhJHJPajk.GuloOgrntRwQ2SDmnu2shD4bPy7qXVq', TRUE, '')
+;
+
+INSERT INTO todos (title, description, priority, complete, owner_id) VALUES
+  ('Go to store','supdawg',4,false,1),
+  ('Haircut','supdawg',3,true,2),
+  ('Feed dog','supdawg',5,false,1),
+  ('Water plant','supdawg',4,false,2),
+  ('Learn something new','supdawg',5,true,1)
+;
+```
+
+
+7. Para poder guardar las contraseñas hasheadas, preparamos el script [**/scripts/encrypt_password.py](/scripts/encrypt_password.py) (~~usa los mismos mecanismos de encriptación que la `app/`, importante~~)
+
+```py
+# scripts/encrypt_password.py
+# ---
+
+# source .venv/bin/activate && \
+# pip install passlib
+# (we should drop it tho, in app/ it requires us to use an outdated version of bcrypt as a dep.)
+
+import argparse
+from passlib.context import CryptContext
+
+# Set up the bcrypt context
+bcrypt_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
+
+def hash_password(password: str) -> str:
+    return bcrypt_context.hash(password)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Hash a password for SQL INSERT.")
+    parser.add_argument("password", help="Password to hash")
+    
+    args = parser.parse_args()
+    hashed_password = hash_password(args.password)
+    print(f"{args.password}: {hashed_password}")
+```
+
+```bash
+# source .venv/bin/activate
+
+python3 scripts/encrypt_password.py -h 123abc
+  # usage: encrypt_password.py [-h] password
+  # 
+  # Hash a password for SQL INSERT.
+  # 
+  # positional arguments:
+  #   password    Password to hash
+  # 
+  # options:
+  #   -h, --help  show this help message and exit
+
+python3 scripts/encrypt_password.py 123abc && \
+python3 scripts/encrypt_password.py 123xyz
+  # 123abc: $2b$12$hevQQk73MbsOt5AG7Ofe7OZ6FWsp9Xwz8gh048fkK06ZuwS1lJ1DW
+  # 123xyz: $2b$12$TFlZ99l/WK/hIhJHJPajk.GuloOgrntRwQ2SDmnu2shD4bPy7qXVq
+```
+
+8.  Finalmente, definimos la conexión FastAPI > PostgreSQL en el [app/database.py](/03-todos-database/app/database.py) usando **dotenv** para sacar los valores de un `.env`
+
+```py
+import os
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path="../.env.development", override=True)
+
+POSTGRES_USER = os.getenv('POSTGRES_USER',"fastapi")
+POSTGRES_PASSWORD = os.getenv('POSTGRES_PASSWORD')
+POSTGRES_HOST = os.getenv('POSTGRES_HOST', "postgresql")
+POSTGRES_PORT = os.getenv('POSTGRES_PORT',5432)
+POSTGRES_DB = os.getenv('POSTGRES_DB',"fastapi")
+
+SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+```
+
+
+### II. Implantar stack y verificar FastAPI requests
+
+DEMO
+
+```bash
+cp .env.example .env.development
+
+sed -i -e "/POSTGRES_USER/s/''/'fastapi'/" \
+       -e "/POSTGRES_PASSWORD/s/''/'s_clpa59Bs?D]BP<AgI'/" \
+       -e "/POSTGRES_HOST/s/''/'fastapi'/" \
+       -e "/POSTGRES_PORT/s/''/5432/" \
+       -e "/POSTGRES_DB/s/''/'fastapi'/" \
+  .env.development
+
+cat .env.development
+  # POSTGRES_USER=fastapi
+  # POSTGRES_PASSWORD=s_clpa59Bs?D]BP<AgI
+  # POSTGRES_HOST=postgresql
+  # POSTGRES_PORT=5432
+  # POSTGRES_DB=fastapi
+```
+
+```bash
+docker compose up -d
+{
+  docker compose logs -f
+}
+
+docker exec -it postgresql psql -U fastapi -d fastapi -c "select * from users;"
+  #  id |      email      | username | first_name | last_name |                       hashed_password                        | is_active | role
+  # ----+-----------------+----------+------------+-----------+--------------------------------------------------------------+-----------+-------
+  #   1 | foo@example.com | foo      | foo        | example   | $2b$12$hevQQk73MbsOt5AG7Ofe7OZ6FWsp9Xwz8gh048fkK06ZuwS1lJ1DW | t         | admin
+  #   2 | bar@example.com | bar      | bar        | example   | $2b$12$TFlZ99l/WK/hIhJHJPajk.GuloOgrntRwQ2SDmnu2shD4bPy7qXVq | t         |
+  # (2 rows)
+
+TOKEN=$(curl -s -X 'POST' 'http://localhost:5012/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'GET' \
+  'http://localhost:5012/user/' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"first_name":"foo","id":1,"last_name":"example","is_active":true,"username":"foo","email":"foo@example.com","hashed_password":"$2b$12$hevQQk73MbsOt5AG7Ofe7OZ6FWsp9Xwz8gh048fkK06ZuwS1lJ1DW","role":"admin"}%
+```
+
+- Crear todo
+
+```bash
+TOKEN=$(curl -s -X 'POST' 'http://localhost:5012/auth/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=foo&password=123abc' \
+  | jq -r .access_token
+) && \
+curl -X 'POST' \
+  'http://localhost:5012/todo' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+  "title": "sup",
+  "description": "dawg",
+  "priority": 3,
+  "complete": true
+}'
+  # null%
+
+curl -X 'GET' \
+  'http://localhost:5012/todo/6' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $TOKEN"
+  # {"title":"sup","priority":3,"owner_id":1,"complete":true,"description":"dawg","id":6}%
+```
+
+
+---
+
+
+### III. pgAdmin (opcional)
+
+Con los 3 servicios funcionando (fastapi, postgresql y pgAdmin), visitamos la Web UI de pgAdmin para vincular la DB y operar
+
+```yaml
+pgAdmin:
+  Login:
+    email: poc@setenova.es
+    password: USd3Fiv2,tJ,b[H\2r{
+  Add New Server:
+    General:
+      Name: FastAPI
+    Connection:
+      Hostname: postgresql
+      Port: 5432
+      Username: fastapi
+      Password: s_clpa59Bs?D]BP<AgI
+      Save password: true
+```
+
+- pgAdmin: conectar con la BD (ya lo hemos hecho)
+- pgAdmin: Servers > FastAPI > Login/Group Roles > **fastapi** > Properties > Privileges > All (**superuser**)
+  - necesitaríamos otros usuarios para los desarrolladores/usuarios?
+- pgAdmin: crear DB... no me gusta el click-click-click...
+
+
+### IV. MySQL (UNDONE)
+
+...
+
+
+---
+
+
+# TEMA DOTENV
+
+```bash
+# source .venv/bin/activate
+pip install python-dotenv
+  # Requirement already satisfied: python-dotenv in ./.venv/lib/python3.10/site-packages (1.0.1)
+```
+
+
+
+
+</details>
+
+---
+
+
+
+## 13. Project 3.5 - [Alembic](https://alembic.sqlalchemy.org/en/latest/) Data Migration
 ## 14. Project 4 - Unit & Integration Testing
 ## 15. Project 5 - Full Stack Application
 ## 16. Git - Version Control

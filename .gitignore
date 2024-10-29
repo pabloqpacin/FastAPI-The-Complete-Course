@@ -1,16 +1,21 @@
 # custom
 *mock*
 
+# env
+.env.development
+.env.production
+
 # python et al.
-.venv/
-
-/fastapienv/
-/.idea/FastAPI-The-Complete-Course.iml
-/.idea/misc.xml
-/.idea/modules.xml
-/.idea/inspectionProfiles/profiles_settings.xml
-/.idea/vcs.xml
-
 __pycache__/
-.idea
-env
+.venv/
+*.db
+
+# /fastapienv/
+# /.idea/FastAPI-The-Complete-Course.iml
+# /.idea/misc.xml
+# /.idea/modules.xml
+# /.idea/inspectionProfiles/profiles_settings.xml
+# /.idea/vcs.xml
+
+# .idea
+# env
