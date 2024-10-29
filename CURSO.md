@@ -97,6 +97,7 @@
     - [II. Implantar stack y verificar FastAPI requests](#ii-implantar-stack-y-verificar-fastapi-requests)
     - [III. pgAdmin (opcional)](#iii-pgadmin-opcional)
     - [IV. MySQL (UNDONE)](#iv-mysql-undone)
+- [TEMA DOTENV](#tema-dotenv)
   - [13. Project 3.5 - Alembic Data Migration](#13-project-35---alembic-data-migration)
   - [14. Project 4 - Unit \& Integration Testing](#14-project-4---unit--integration-testing)
   - [15. Project 5 - Full Stack Application](#15-project-5---full-stack-application)
@@ -3875,15 +3876,22 @@ python3 scripts/encrypt_password.py 123xyz
   # 123xyz: $2b$12$TFlZ99l/WK/hIhJHJPajk.GuloOgrntRwQ2SDmnu2shD4bPy7qXVq
 ```
 
-8.  Finalmente, definimos la conexión FastAPI > PostgreSQL en el [app/database.py](/03-todos-database/app/database.py)
-
-> - [ ] **DEUDA TÉCNICA**: sacar los valores de un `.env` con python `dotenv` para conexión o así o ke
+8.  Finalmente, definimos la conexión FastAPI > PostgreSQL en el [app/database.py](/03-todos-database/app/database.py) usando **dotenv** para sacar los valores de un `.env`
 
 ```py
-# SQLALCHEMY_DATABASE_URL='sqlite:///./todosapp.db'
-SQLALCHEMY_DATABASE_URL='postgresql://fastapi:s_clpa59Bs?D]BP<AgI@postgresql:5432/fastapi'
+import os
+from dotenv import load_dotenv
 
-# engine = create_engine(SQLALCHEMY_DATABASE_URL,connect_args={'check_same_thread':False})
+load_dotenv(dotenv_path="../.env.development", override=True)
+
+POSTGRES_USER = os.getenv('POSTGRES_USER',"fastapi")
+POSTGRES_PASSWORD = os.getenv('POSTGRES_PASSWORD')
+POSTGRES_HOST = os.getenv('POSTGRES_HOST', "postgresql")
+POSTGRES_PORT = os.getenv('POSTGRES_PORT',5432)
+POSTGRES_DB = os.getenv('POSTGRES_DB',"fastapi")
+
+SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 ```
 
@@ -3895,15 +3903,19 @@ DEMO
 ```bash
 cp .env.example .env.development
 
-sed -i -e "/POSTGRES_DB/s/''/'fastapi'/" \
-       -e "/POSTGRES_USER/s/''/'fastapi'/" \
+sed -i -e "/POSTGRES_USER/s/''/'fastapi'/" \
        -e "/POSTGRES_PASSWORD/s/''/'s_clpa59Bs?D]BP<AgI'/" \
+       -e "/POSTGRES_HOST/s/''/'fastapi'/" \
+       -e "/POSTGRES_PORT/s/''/5432/" \
+       -e "/POSTGRES_DB/s/''/'fastapi'/" \
   .env.development
 
 cat .env.development
-  # POSTGRES_DB='fastapi'
-  # POSTGRES_USER='fastapi'
-  # POSTGRES_PASSWORD='s_clpa59Bs?D]BP<AgI'
+  # POSTGRES_USER=fastapi
+  # POSTGRES_PASSWORD=s_clpa59Bs?D]BP<AgI
+  # POSTGRES_HOST=postgresql
+  # POSTGRES_PORT=5432
+  # POSTGRES_DB=fastapi
 ```
 
 ```bash
@@ -3955,7 +3967,7 @@ curl -X 'POST' \
 curl -X 'GET' \
   'http://localhost:5012/todo/6' \
   -H 'accept: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "Authorization: Bearer $TOKEN"
   # {"title":"sup","priority":3,"owner_id":1,"complete":true,"description":"dawg","id":6}%
 ```
 
@@ -3992,6 +4004,18 @@ pgAdmin:
 ### IV. MySQL (UNDONE)
 
 ...
+
+
+---
+
+
+# TEMA DOTENV
+
+```bash
+# source .venv/bin/activate
+pip install python-dotenv
+  # Requirement already satisfied: python-dotenv in ./.venv/lib/python3.10/site-packages (1.0.1)
+```
 
 
 
