@@ -10,7 +10,7 @@ services:
     ports:
       - "5012:80"
     env_file:
-      - ./.env.example
+      - ./.env.development
     # Para prod., comentar el volumen y montar la app/ en la imagen (Dockerfile)
     volumes:
       - ./app:/app
@@ -22,11 +22,11 @@ services:
   postgresql:
     image: postgres:16.1-alpine
     container_name: postgresql
-    # Descomentar el puerto para conectarnos con pgadmin, dbeaver o lo que sea (fastapi uses 5432 anyways)
+    # Descomentar el puerto para conectarnos con pgadmin, dbeaver o lo que sea (fastapi usa 5432)
     # ports:
     #   - "5010:5432"
     env_file:
-      - ./.env.example
+      - ./.env.development
     volumes:
       - postgresql_data:/var/lib/postgresql/data
       - ./db/fastapi_todos.sql:/docker-entrypoint-initdb.d/fastapi_todos.sql:ro
