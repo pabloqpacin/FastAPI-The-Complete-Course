@@ -4304,7 +4304,9 @@ docker exec -it postgresql psql -U fastapi -d fastapi -c "select email,phone_num
 ```bash
 source .venv/bin/activate
 
+pip install -r requirements.txt
 pip install pytest
+pip freeze > requirements.txt
 ```
 
 - CICD
@@ -4421,8 +4423,60 @@ def default_employee():
     return Student('John', 'Doe', 'Computer Science', 3)
 ```
 
+Corriendo en local con el `.venv`
+
+```bash
+pytest
+  # ==================================================== test session starts ====================================================
+  # platform linux -- Python 3.10.12, pytest-8.3.3, pluggy-1.5.0
+  # rootdir: /home/pabloqpacin/repos/FastAPI-The-Complete-Course/03-todos-database
+  # collected 7 items
+
+  # tests/test_basics.py ......                                                                                           [ 85%]
+  # tests/test_objects.py .                                                                                               [100%]
+
+  # ===================================================== 7 passed in 0.01s =====================================================
+```
+
+Corriendo el stack dockerizado con el `requirements.txt` actualizado etc.
+
+```bash
+docker exec fastapi pytest
+  # ============================= test session starts ==============================
+  # platform linux -- Python 3.12.7, pytest-8.3.3, pluggy-1.5.0
+  # rootdir: /app
+  # plugins: anyio-4.6.2.post1
+  # collected 7 items
+
+  # src/tests/test_basics.py ......                                          [ 85%]
+  # src/tests/test_objects.py .                                              [100%]
+
+  # ============================== 7 passed in 0.02s ===============================
+```
+
+
 
 #### 5. Create FastAPI Test
+
+Añadir `/healthy` endpoint en `main.py` y verificar
+
+```py
+# API healthcheck endpoint
+@app.get("/healthy")
+def health_check():
+    return {'status': 'Healthy'}
+```
+```bash
+curl localhost:5012/healthy
+  # {"status":"Healthy"}%
+```
+
+
+```
+```
+
+
+
 #### 6. Root Package
 #### 7. Pytest - Setup Dependencies
 #### 8. Pytest - FastAPI Complete
