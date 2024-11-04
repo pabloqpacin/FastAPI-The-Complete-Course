@@ -103,6 +103,15 @@
       - [3. Alembic Downgrade](#3-alembic-downgrade)
       - [4. Alembic Assignment](#4-alembic-assignment)
   - [14. Project 4 - Unit \& Integration Testing](#14-project-4---unit--integration-testing)
+      - [1. Testing Overview](#1-testing-overview)
+      - [2. Pytest Installation](#2-pytest-installation)
+      - [3. Pytest Basics](#3-pytest-basics)
+      - [4. Pytest Objects \& Fixtures](#4-pytest-objects--fixtures)
+      - [5. Create FastAPI Test](#5-create-fastapi-test)
+      - [6. Root Package](#6-root-package)
+      - [7. Pytest - Setup Dependencies](#7-pytest---setup-dependencies)
+      - [8. Pytest - FastAPI Complete](#8-pytest---fastapi-complete)
+      - [9. Pytest - FastAPI Project Test 1-12](#9-pytest---fastapi-project-test-1-12)
   - [15. Project 5 - Full Stack Application](#15-project-5---full-stack-application)
   - [16. Git - Version Control](#16-git---version-control)
   - [17. Deploying FastAPI Applications](#17-deploying-fastapi-applications)
@@ -4270,6 +4279,158 @@ docker exec -it postgresql psql -U fastapi -d fastapi -c "select email,phone_num
 ---
 
 ## 14. Project 4 - Unit & Integration Testing
+
+<!-- > [!NOTE]
+> `mv .venv 03-todos-database/` -->
+
+#### 1. Testing Overview
+
+- **Testing**: part of Software Development Lifecycle (SDLC) to identify: bugs, errors, defects, ensure software's quality and expectations
+- **Types**:
+  - **Manual Testing**: run and see
+  - **Unit Testing**: test individual testable components (unit == testable component); automated and executed by a framework (*Pytest*)
+  - **Integration Testing**: test interaction between units, broader scope
+- ***Pytest***: framework for Python: simple, scalable and for both Unit and Integration. Benefits:
+  - Simple and Flexible: Native Assertions
+  - Fixture: Feature setup and teardown
+  - Parametized Testing: Run same tests with different data
+- **Usage**: Pytest will run all tests automatically that sit within files that have the name 'test' in them"; we could have many files like `test_<file_to_test>.py` but we're using only one in this demo...
+
+
+#### 2. Pytest Installation
+
+- Manual
+
+```bash
+source .venv/bin/activate
+
+pip install pytest
+```
+
+- CICD
+
+```bash
+# ...
+```
+
+#### 3. Pytest Basics
+
+**Assertion Unit Tests**: if condition is True, pass test; fail otherwise
+
+```py
+# 03-todos-database/tests/test_basics.py
+# ---
+
+##### UNIT TESTING #####
+### Assertion Test ###
+
+# Validate Integers
+def test_equal_or_not_equal():
+    assert 3 == (2+1)
+    assert 3 != (2+2)
+
+# Validate Instances
+def test_is_instance():
+    assert isinstance('this is a string', str)
+    assert not isinstance('10', int)
+    assert isinstance(10, int)
+
+# Validate Booleans
+def test_boolean():
+    validated = True
+    assert validated is True
+    assert ('hello' == 'world') is False
+
+# Validate Types
+def test_type():
+    assert type('Hello' == str)
+    assert type('World' != int)
+
+# Validate Greater & Less Than
+def test_greater_and_less_than():
+    assert 7 > 3
+    assert 4 < 10
+
+# Validate Lists
+def test_list():
+    num_list = [1, 2, 3, 4, 5]
+    any_list = [False, False]
+    assert 1 in num_list
+    assert 7 not in num_list
+    assert all(num_list)
+    assert not any(any_list)
+
+"""
+The all() function returns True if all elements in the list are "truthy" (not False, 0, None, or an empty value).
+In num_list, all values are non-zero integers, so they are all considered truthy.
+Therefore, all(num_list) evaluates to True, and this assertion passes.
+
+The any() function returns True if any element in the list is truthy.
+any_list only contains False values, so any(any_list) evaluates to False.
+The assertion not any(any_list) checks that no elements in any_list are truthy (in other words, all are False), which is True, so this assertion passes.
+"""
+```
+```bash
+pytest
+  # ==================================================== test session starts ====================================================
+  # platform linux -- Python 3.10.12, pytest-8.3.3, pluggy-1.5.0
+  # rootdir: /home/pabloqpacin/repos/FastAPI-The-Complete-Course/03-todos-database
+  # collected 6 items
+
+  # tests/test_basics.py ......                                                                                           [100%]
+
+  # ===================================================== 6 passed in 0.01s =====================================================
+```
+
+#### 4. Pytest Objects & Fixtures
+
+Reusability...
+
+```py
+# 03-todos-database/tests/test_objects.py
+# ---
+
+import pytest
+
+# Create Python Object (elsewhere in the codebase)
+class Student:
+    def __init__(self, first_name: str, last_name: str, major: str, years: int):
+        self.first_name = first_name
+        self.last_name = last_name
+        self.major = major
+        self.years = years
+
+"""
+# Test manual, no bueno
+def test_person_initialization():
+    p = Student('John', 'Doe', 'Computer Science', 3)
+    assert p.first_name == 'John', 'First name should be John'
+    assert p.last_name == 'Doe', 'Last name should be Doe'
+    assert p.major == 'Computer Science'
+    assert p.years == 3
+"""
+
+def test_person_initialization(default_employee):
+    assert default_employee.first_name == 'John', 'First name should be John'
+    assert default_employee.last_name == 'Doe', 'Last name should be Doe'
+    assert default_employee.major == 'Computer Science'
+    assert default_employee.years == 3
+
+@pytest.fixture
+def default_employee():
+    return Student('John', 'Doe', 'Computer Science', 3)
+```
+
+
+#### 5. Create FastAPI Test
+#### 6. Root Package
+#### 7. Pytest - Setup Dependencies
+#### 8. Pytest - FastAPI Complete
+#### 9. Pytest - FastAPI Project Test 1-12
+
+
+
+
 ## 15. Project 5 - Full Stack Application
 ## 16. Git - Version Control
 ## 17. Deploying FastAPI Applications
