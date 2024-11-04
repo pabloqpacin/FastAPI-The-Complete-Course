@@ -9,7 +9,6 @@ from sqlalchemy.pool import StaticPool
 from database import Base
 from main import app
 from models import Todos
-from routers.todos import get_db, get_current_user
 
 
 # Database configuration
@@ -34,8 +33,6 @@ def override_get_db() -> Generator:
 def override_get_current_user() -> dict:
     return {'username': 'test', 'id': 1, 'user_role': 'admin'}
 
-app.dependency_overrides[get_db] = override_get_db
-app.dependency_overrides[get_current_user] = override_get_current_user
 
 # Test client
 client = TestClient(app)
