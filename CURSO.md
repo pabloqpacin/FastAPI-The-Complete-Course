@@ -109,7 +109,8 @@
       - [4. Pytest Objects \& Fixtures](#4-pytest-objects--fixtures)
       - [5. Create FastAPI Test](#5-create-fastapi-test)
       - [6. Pytest - Setup Dependencies \& Test Todos](#6-pytest---setup-dependencies--test-todos)
-      - [7. Pytest - FastAPI Project Test 1-12](#7-pytest---fastapi-project-test-1-12)
+      - [7. Pytest - Test all routers](#7-pytest---test-all-routers)
+      - [8. CUSTOM: CI/CD](#8-custom-cicd)
   - [15. Project 5 - Full Stack Application](#15-project-5---full-stack-application)
   - [16. Git - Version Control](#16-git---version-control)
   - [17. Deploying FastAPI Applications](#17-deploying-fastapi-applications)
@@ -4283,6 +4284,8 @@ docker exec -it postgresql psql -U fastapi -d fastapi -c "select email,phone_num
 
 #### 1. Testing Overview
 
+<details>
+
 - **Testing**: part of Software Development Lifecycle (SDLC) to identify: bugs, errors, defects, ensure software's quality and expectations
 - **Types**:
   - **Manual Testing**: run and see
@@ -4294,28 +4297,28 @@ docker exec -it postgresql psql -U fastapi -d fastapi -c "select email,phone_num
   - Parametized Testing: Run same tests with different data
 - **Usage**: Pytest will run all tests automatically that sit within files that have the name 'test' in them"; we could have many files like `test_<file_to_test>.py` but we're using only one in this demo...
 
+</details>
 
 #### 2. Pytest Installation
 
-- Manual
+En `.venv`
 
 ```bash
 source .venv/bin/activate
 
 pip install -r requirements.txt
-pip install pytest
+pip install pytest pytest-asyncio
 pip freeze > requirements.txt
 ```
 
-- CICD
+En **GitHub Actions** directamente mediante en el workflow (ver el [# 8. CUSTOM CI/CD](#8-custom-cicd) más abajo) con el `requirements.txt`
 
-```bash
-# ...
-```
 
 #### 3. Pytest Basics
 
 **Assertion Unit Tests**: if condition is True, pass test; fail otherwise
+
+<details>
 
 ```py
 # 03-todos-database/tests/test_basics.py
@@ -4452,6 +4455,8 @@ docker exec fastapi pytest
   # ============================== 7 passed in 0.02s ===============================
 ```
 
+</details>
+
 
 #### 5. Create FastAPI Test
 
@@ -4462,6 +4467,9 @@ Crear `pytest.ini`
 testpaths = tests
 pythonpath = src
 ```
+
+<details>
+<summary>Código en `03-todos-database/tests/`</summary>
 
 Añadir `/healthy` endpoint en `main.py` y verificar
 
@@ -4534,7 +4542,6 @@ docker exec fastapi pytest -v --disable-warnings
   # ========================= 1 passed, 1 warning in 0.71s =========================
 ```
 
-
 #### 6. Pytest - Setup Dependencies & Test Todos
 
 > To test `read_all` we'll need to pass MOCK arguments (as in `async def read_all(user:user_dependency,db:db_dependency):`)
@@ -4557,8 +4564,8 @@ from sqlalchemy.pool import StaticPool
 
 from database import Base
 from main import app
-from models import Todos
-from routers.todos import get_db, get_current_user
+from models import Users, Todos
+from routers.auth import bcrypt_context
 
 
 # Database configuration
@@ -4583,9 +4590,6 @@ def override_get_db() -> Generator:
 def override_get_current_user() -> dict:
     return {'username': 'test', 'id': 1, 'user_role': 'admin'}
 
-app.dependency_overrides[get_db] = override_get_db
-app.dependency_overrides[get_current_user] = override_get_current_user
-
 # Test client
 client = TestClient(app)
 
@@ -4602,14 +4606,35 @@ def test_todo() -> Todos:
     db.query(Todos).delete()  # Cleaner ORM-based deletion
     db.commit()
     db.close()
+
+# Test fixture for creating and cleaning up a test user
+@pytest.fixture
+def test_user() -> Todos:
+    user = Users(
+        username="Test", email="test@example.com", first_name="Test", last_name="Example",
+        hashed_password=bcrypt_context.hash("999abc"), role="admin",
+    )
+    db = TestingSessionLocal()
+    db.add(user)
+    db.commit()
+    yield user
+    db.query(Users).delete()  # Cleaner ORM-based deletion
+    db.commit()
+    db.close()
 ```
 ```py
 # tests/test_todos.py
 
 from fastapi import status
 
-from models import Todos
-from utils import client, test_todo, TestingSessionLocal
+from routers.todos import get_current_user, get_db
+from utils import app, client, override_get_current_user, \
+                  override_get_db, test_todo, TestingSessionLocal, Todos
+
+
+app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_current_user] = override_get_current_user
+
 
 # ===== GET =====
 
@@ -4723,8 +4748,238 @@ docker exec fastapi pytest -vvv --disable-warnings
   # ========================= 9 passed, 1 warning in 0.74s =========================
 ```
 
+#### 7. Pytest - Test all routers
 
-#### 7. Pytest - FastAPI Project Test 1-12
+```py
+# tests/test_admin.py
+
+from fastapi import status
+
+from routers.admin import get_current_user, get_db
+from utils import app, client, override_get_current_user, \
+                  override_get_db, test_todo, TestingSessionLocal, Todos
+
+
+app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_current_user] = override_get_current_user
+
+
+# ===== GET =====
+
+def test_admin_read_all_authenticated(test_todo):
+    response = client.get("/admin/todo")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == [{
+        'id': 1, 'title': 'Learn to code!', 'description': 'supdawg',
+        'priority': 4, 'complete': False, 'owner_id': 1
+    }]
+
+# ===== DELETE =====
+
+def test_admin_delete_todo(test_todo):
+    response = client.delete("/admin/todo/1")
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    db = TestingSessionLocal()
+    model = db.query(Todos).filter(Todos.id == 1).first()
+    db.close()
+    assert model is None
+
+def test_admin_delete_todo_not_found():
+    response = client.delete("/admin/todo/999")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json() == {'detail': 'Todo not found.'}
+```
+
+```py
+# tests/test_users.py
+
+from fastapi import status
+
+from routers.users import get_current_user, get_db
+from utils import app, client, override_get_current_user, \
+                  override_get_db, test_user, TestingSessionLocal, Todos
+
+
+app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_current_user] = override_get_current_user
+
+
+# ===== GET =====
+
+def test_return_user(test_user):
+    response = client.get("/user")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()['username'] == 'Test'
+    assert response.json()['first_name'] == 'Test'
+    assert response.json()['last_name'] == 'Example'
+    assert response.json()['email'] == 'test@example.com'
+    assert response.json()['role'] == 'admin'
+
+# ===== PUT =====
+
+def test_change_password_sucess(test_user):
+    response = client.put("/user/password", json={
+        "password": "999abc", "new_password": "666xyz"
+    })
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+
+def test_change_password_invalid_current_password(test_user):
+    response = client.put("/user/password", json={
+        "password": "xxxxxx", "new_password": "666xyz"
+    })
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert response.json() == {'detail': 'Error on password change'}
+```
+```py
+# test_auth.py
+
+from datetime import timedelta
+
+from fastapi import status, HTTPException
+from jose import jwt
+import pytest
+
+from routers.auth import authenticate_user, create_access_token, \
+                         get_current_user, get_db, SECRET_KEY, ALGORITHM
+from utils import app, client, override_get_current_user, \
+                  override_get_db, test_user, TestingSessionLocal, Todos
+
+
+app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_current_user] = override_get_current_user
+
+
+# ===== ... =====
+
+def test_authenticate_user(test_user):
+    db = TestingSessionLocal()
+
+    authenticated_user = authenticate_user(test_user.username, '999abc', db)
+    assert authenticated_user is not None
+    assert authenticated_user.username == test_user.username
+
+    non_existent_user = authenticate_user('Wrong_Username', '999abc', db)
+    assert non_existent_user is False
+
+    wrong_password_user = authenticate_user(test_user.username, 'xxxxxx', db)
+    assert wrong_password_user is False
+
+
+def test_create_access_token():
+    username = 'Test'
+    user_id = 1
+    role = 'user'
+    expires_delta = timedelta(days=1)
+
+    token = create_access_token(username, user_id, role, expires_delta)
+    decoded_token = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
+    assert decoded_token['sub'] == username
+    assert decoded_token['id'] == user_id
+    assert decoded_token['role'] == role
+
+@pytest.mark.asyncio
+async def test_get_current_user_valid_token():
+    encode = {'sub': 'testuser', 'id': 1, 'role': 'admin'}
+    token = jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
+
+    user = await get_current_user(token=token)
+    assert user ==  {'username': 'testuser', 'id': 1, 'user_role': 'admin'}
+    
+@pytest.mark.asyncio
+async def test_get_current_user_missing_payload():
+    encode = {'role': 'admin'}
+    token = jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
+
+    with pytest.raises(HTTPException) as excinfo:
+        await get_current_user(token=token)
+
+    assert excinfo.value.status_code == status.HTTP_401_UNAUTHORIZED
+    assert excinfo.value.detail == 'Could not validate user'
+```
+
+```bash
+docker exec fastapi pytest -vvv --disable-warnings
+  # /usr/local/lib/python3.12/site-packages/pytest_asyncio/plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+  # The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  #   warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+  # ============================= test session starts ==============================
+  # platform linux -- Python 3.12.7, pytest-8.3.3, pluggy-1.5.0 -- /usr/local/bin/python3.12
+  # cachedir: .pytest_cache
+  # rootdir: /app
+  # configfile: pytest.ini
+  # testpaths: tests
+  # plugins: anyio-4.6.2.post1, asyncio-0.24.0
+  # asyncio: mode=Mode.STRICT, default_loop_scope=None
+  # collecting ... collected 19 items
+
+  # tests/test_admin.py::test_admin_read_all_authenticated PASSED            [  5%]
+  # tests/test_admin.py::test_admin_delete_todo PASSED                       [ 10%]
+  # tests/test_admin.py::test_admin_delete_todo_not_found PASSED             [ 15%]
+  # tests/test_auth.py::test_authenticate_user PASSED                        [ 21%]
+  # tests/test_auth.py::test_create_access_token PASSED                      [ 26%]
+  # tests/test_auth.py::test_get_current_user_valid_token PASSED             [ 31%]
+  # tests/test_auth.py::test_get_current_user_missing_payload PASSED         [ 36%]
+  # tests/test_main.py::test_return_healthcheck PASSED                       [ 42%]
+  # tests/test_todos.py::test_read_all_authenticated PASSED                  [ 47%]
+  # tests/test_todos.py::test_read_one_authenticated PASSED                  [ 52%]
+  # tests/test_todos.py::test_read_one_authenticated_not_found PASSED        [ 57%]
+  # tests/test_todos.py::test_create_todo PASSED                             [ 63%]
+  # tests/test_todos.py::test_update_todo PASSED                             [ 68%]
+  # tests/test_todos.py::test_update_todo_not_found PASSED                   [ 73%]
+  # tests/test_todos.py::test_delete_todo PASSED                             [ 78%]
+  # tests/test_todos.py::test_delete_todo_not_found PASSED                   [ 84%]
+  # tests/test_users.py::test_return_user PASSED                             [ 89%]
+  # tests/test_users.py::test_change_password_sucess PASSED                  [ 94%]
+  # tests/test_users.py::test_change_password_invalid_current_password PASSED [100%]
+
+  # ======================== 19 passed, 2 warnings in 2.50s ========================
+
+# ---
+docker exec fastapi pytest
+  # /usr/local/lib/python3.12/site-packages/pytest_asyncio/plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+  # The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  #   warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+  # ============================= test session starts ==============================
+  # platform linux -- Python 3.12.7, pytest-8.3.3, pluggy-1.5.0
+  # rootdir: /app
+  # configfile: pytest.ini
+  # testpaths: tests
+  # plugins: anyio-4.6.2.post1, asyncio-0.24.0
+  # asyncio: mode=Mode.STRICT, default_loop_scope=None
+  # collected 19 items
+
+  # tests/test_admin.py ...                                                  [ 15%]
+  # tests/test_auth.py ....                                                  [ 36%]
+  # tests/test_main.py .                                                     [ 42%]
+  # tests/test_todos.py ........                                             [ 84%]
+  # tests/test_users.py ...                                                  [100%]
+
+  # =============================== warnings summary ===============================
+  # ../usr/local/lib/python3.12/site-packages/passlib/utils/__init__.py:854
+  #   /usr/local/lib/python3.12/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+  #     from crypt import crypt as _crypt
+
+  # tests/test_auth.py::test_create_access_token
+  #   /usr/local/lib/python3.12/site-packages/jose/jwt.py:311: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  #     now = timegm(datetime.utcnow().utctimetuple())
+
+  # -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  # ======================== 19 passed, 2 warnings in 2.50s ========================
+```
+
+</details>
+
+
+#### 8. CUSTOM: CI/CD
+
+> [!IMPORTANT]
+> **WIP**
+
 
 
 

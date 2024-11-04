@@ -68,7 +68,7 @@ def create_access_token(username:str,user_id:int,role:str,expires_delta:timedelt
 async def get_current_user(token:Annotated[str,Depends(oauth2_bearer)]):
     credentials_exception=HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail='Could not validate credentials',
+        detail='Could not validate user',
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
