@@ -4458,6 +4458,14 @@ docker exec fastapi pytest
 
 #### 5. Create FastAPI Test
 
+Crear `pytest.ini`
+
+```ini
+[pytest]
+testpaths = tests
+pythonpath = src
+```
+
 Añadir `/healthy` endpoint en `main.py` y verificar
 
 ```py
@@ -4471,13 +4479,68 @@ curl localhost:5012/healthy
   # {"status":"Healthy"}%
 ```
 
+Nuevo `tests/test_main.py`
 
+```py
+# src/tests/test_main.py
+
+from fastapi import status
+from starlette.testclient import TestClient
+
+from main import app
+
+
+client = TestClient(app)
+
+def test_return_healthcheck():
+    response = client.get("/healthy")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {'status': 'Healthy'}
 ```
+
+Verificar
+
+```bash
+docker exec fastapi pytest
+  # ============================= test session starts ==============================
+  # platform linux -- Python 3.12.7, pytest-8.3.3, pluggy-1.5.0
+  # rootdir: /app
+  # configfile: pytest.ini
+  # testpaths: tests
+  # plugins: anyio-4.6.2.post1
+  # collected 1 item
+
+  # tests/test_main.py .                                                     [100%]
+
+  # =============================== warnings summary ===============================
+  # ../usr/local/lib/python3.12/site-packages/passlib/utils/__init__.py:854
+  #   /usr/local/lib/python3.12/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+  #     from crypt import crypt as _crypt
+
+  # -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  # ========================= 1 passed, 1 warning in 0.66s =========================
+
+
+# ---
+docker exec fastapi pytest -v --disable-warnings
+  # ============================= test session starts ==============================
+  # platform linux -- Python 3.12.7, pytest-8.3.3, pluggy-1.5.0 -- /usr/local/bin/python3.12
+  # cachedir: .pytest_cache
+  # rootdir: /app
+  # configfile: pytest.ini
+  # testpaths: tests
+  # plugins: anyio-4.6.2.post1
+  # collecting ... collected 1 item
+
+  # tests/test_main.py::test_return_healthcheck PASSED                       [100%]
+
+  # ========================= 1 passed, 1 warning in 0.71s =========================
 ```
-
-
 
 #### 6. Root Package
+
+
+
 #### 7. Pytest - Setup Dependencies
 #### 8. Pytest - FastAPI Complete
 #### 9. Pytest - FastAPI Project Test 1-12
