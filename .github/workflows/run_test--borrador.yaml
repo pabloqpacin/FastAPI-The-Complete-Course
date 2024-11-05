@@ -8,8 +8,8 @@ on:
     branches:
       - "main"
       - "devel"
-    paths:
-      - "03-todos-database"
+    # paths:
+    #   - "03-todos-database"
 
 jobs:
   build:
