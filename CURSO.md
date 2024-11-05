@@ -103,6 +103,14 @@
       - [3. Alembic Downgrade](#3-alembic-downgrade)
       - [4. Alembic Assignment](#4-alembic-assignment)
   - [14. Project 4 - Unit \& Integration Testing](#14-project-4---unit--integration-testing)
+      - [1. Testing Overview](#1-testing-overview)
+      - [2. Pytest Installation](#2-pytest-installation)
+      - [3. Pytest Basics](#3-pytest-basics)
+      - [4. Pytest Objects \& Fixtures](#4-pytest-objects--fixtures)
+      - [5. Create FastAPI Test](#5-create-fastapi-test)
+      - [6. Pytest - Setup Dependencies \& Test Todos](#6-pytest---setup-dependencies--test-todos)
+      - [7. Pytest - Test all routers](#7-pytest---test-all-routers)
+      - [8. CUSTOM: CI/CD](#8-custom-cicd)
   - [15. Project 5 - Full Stack Application](#15-project-5---full-stack-application)
   - [16. Git - Version Control](#16-git---version-control)
   - [17. Deploying FastAPI Applications](#17-deploying-fastapi-applications)
@@ -4270,6 +4278,712 @@ docker exec -it postgresql psql -U fastapi -d fastapi -c "select email,phone_num
 ---
 
 ## 14. Project 4 - Unit & Integration Testing
+
+<!-- > [!NOTE]
+> `mv .venv 03-todos-database/` -->
+
+#### 1. Testing Overview
+
+<details>
+
+- **Testing**: part of Software Development Lifecycle (SDLC) to identify: bugs, errors, defects, ensure software's quality and expectations
+- **Types**:
+  - **Manual Testing**: run and see
+  - **Unit Testing**: test individual testable components (unit == testable component); automated and executed by a framework (*Pytest*)
+  - **Integration Testing**: test interaction between units, broader scope
+- ***Pytest***: framework for Python: simple, scalable and for both Unit and Integration. Benefits:
+  - Simple and Flexible: Native Assertions
+  - Fixture: Feature setup and teardown
+  - Parametized Testing: Run same tests with different data
+- **Usage**: Pytest will run all tests automatically that sit within files that have the name 'test' in them"; we could have many files like `test_<file_to_test>.py` but we're using only one in this demo...
+
+</details>
+
+#### 2. Pytest Installation
+
+En `.venv`
+
+```bash
+source .venv/bin/activate
+
+pip install -r requirements.txt
+pip install pytest pytest-asyncio
+pip freeze > requirements.txt
+```
+
+En **GitHub Actions** directamente mediante en el workflow (ver el [# 8. CUSTOM CI/CD](#8-custom-cicd) más abajo) con el `requirements.txt`
+
+
+#### 3. Pytest Basics
+
+**Assertion Unit Tests**: if condition is True, pass test; fail otherwise
+
+<details>
+
+```py
+# 03-todos-database/tests/test_basics.py
+# ---
+
+##### UNIT TESTING #####
+### Assertion Test ###
+
+# Validate Integers
+def test_equal_or_not_equal():
+    assert 3 == (2+1)
+    assert 3 != (2+2)
+
+# Validate Instances
+def test_is_instance():
+    assert isinstance('this is a string', str)
+    assert not isinstance('10', int)
+    assert isinstance(10, int)
+
+# Validate Booleans
+def test_boolean():
+    validated = True
+    assert validated is True
+    assert ('hello' == 'world') is False
+
+# Validate Types
+def test_type():
+    assert type('Hello' == str)
+    assert type('World' != int)
+
+# Validate Greater & Less Than
+def test_greater_and_less_than():
+    assert 7 > 3
+    assert 4 < 10
+
+# Validate Lists
+def test_list():
+    num_list = [1, 2, 3, 4, 5]
+    any_list = [False, False]
+    assert 1 in num_list
+    assert 7 not in num_list
+    assert all(num_list)
+    assert not any(any_list)
+
+"""
+The all() function returns True if all elements in the list are "truthy" (not False, 0, None, or an empty value).
+In num_list, all values are non-zero integers, so they are all considered truthy.
+Therefore, all(num_list) evaluates to True, and this assertion passes.
+
+The any() function returns True if any element in the list is truthy.
+any_list only contains False values, so any(any_list) evaluates to False.
+The assertion not any(any_list) checks that no elements in any_list are truthy (in other words, all are False), which is True, so this assertion passes.
+"""
+```
+```bash
+pytest
+  # ==================================================== test session starts ====================================================
+  # platform linux -- Python 3.10.12, pytest-8.3.3, pluggy-1.5.0
+  # rootdir: /home/pabloqpacin/repos/FastAPI-The-Complete-Course/03-todos-database
+  # collected 6 items
+
+  # tests/test_basics.py ......                                                                                           [100%]
+
+  # ===================================================== 6 passed in 0.01s =====================================================
+```
+
+#### 4. Pytest Objects & Fixtures
+
+Reusability...
+
+```py
+# 03-todos-database/tests/test_objects.py
+# ---
+
+import pytest
+
+# Create Python Object (elsewhere in the codebase)
+class Student:
+    def __init__(self, first_name: str, last_name: str, major: str, years: int):
+        self.first_name = first_name
+        self.last_name = last_name
+        self.major = major
+        self.years = years
+
+"""
+# Test manual, no bueno
+def test_person_initialization():
+    p = Student('John', 'Doe', 'Computer Science', 3)
+    assert p.first_name == 'John', 'First name should be John'
+    assert p.last_name == 'Doe', 'Last name should be Doe'
+    assert p.major == 'Computer Science'
+    assert p.years == 3
+"""
+
+def test_person_initialization(default_employee):
+    assert default_employee.first_name == 'John', 'First name should be John'
+    assert default_employee.last_name == 'Doe', 'Last name should be Doe'
+    assert default_employee.major == 'Computer Science'
+    assert default_employee.years == 3
+
+@pytest.fixture
+def default_employee():
+    return Student('John', 'Doe', 'Computer Science', 3)
+```
+
+Corriendo en local con el `.venv`
+
+```bash
+pytest
+  # ==================================================== test session starts ====================================================
+  # platform linux -- Python 3.10.12, pytest-8.3.3, pluggy-1.5.0
+  # rootdir: /home/pabloqpacin/repos/FastAPI-The-Complete-Course/03-todos-database
+  # collected 7 items
+
+  # tests/test_basics.py ......                                                                                           [ 85%]
+  # tests/test_objects.py .                                                                                               [100%]
+
+  # ===================================================== 7 passed in 0.01s =====================================================
+```
+
+Corriendo el stack dockerizado con el `requirements.txt` actualizado etc.
+
+```bash
+docker exec fastapi pytest
+  # ============================= test session starts ==============================
+  # platform linux -- Python 3.12.7, pytest-8.3.3, pluggy-1.5.0
+  # rootdir: /app
+  # plugins: anyio-4.6.2.post1
+  # collected 7 items
+
+  # src/tests/test_basics.py ......                                          [ 85%]
+  # src/tests/test_objects.py .                                              [100%]
+
+  # ============================== 7 passed in 0.02s ===============================
+```
+
+</details>
+
+
+#### 5. Create FastAPI Test
+
+Crear `pytest.ini`
+
+```ini
+[pytest]
+testpaths = tests
+pythonpath = src
+```
+
+<details>
+<summary>Código en `03-todos-database/tests/`</summary>
+
+Añadir `/healthy` endpoint en `main.py` y verificar
+
+```py
+# API healthcheck endpoint
+@app.get("/healthy")
+def health_check():
+    return {'status': 'Healthy'}
+```
+```bash
+curl localhost:5012/healthy
+  # {"status":"Healthy"}%
+```
+
+Nuevo `tests/test_main.py`
+
+```py
+# src/tests/test_main.py
+
+from fastapi import status
+from starlette.testclient import TestClient
+
+from main import app
+
+
+client = TestClient(app)
+
+def test_return_healthcheck():
+    response = client.get("/healthy")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {'status': 'Healthy'}
+```
+
+Verificar
+
+```bash
+docker exec fastapi pytest
+  # ============================= test session starts ==============================
+  # platform linux -- Python 3.12.7, pytest-8.3.3, pluggy-1.5.0
+  # rootdir: /app
+  # configfile: pytest.ini
+  # testpaths: tests
+  # plugins: anyio-4.6.2.post1
+  # collected 1 item
+
+  # tests/test_main.py .                                                     [100%]
+
+  # =============================== warnings summary ===============================
+  # ../usr/local/lib/python3.12/site-packages/passlib/utils/__init__.py:854
+  #   /usr/local/lib/python3.12/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+  #     from crypt import crypt as _crypt
+
+  # -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  # ========================= 1 passed, 1 warning in 0.66s =========================
+
+
+# ---
+docker exec fastapi pytest -v --disable-warnings
+  # ============================= test session starts ==============================
+  # platform linux -- Python 3.12.7, pytest-8.3.3, pluggy-1.5.0 -- /usr/local/bin/python3.12
+  # cachedir: .pytest_cache
+  # rootdir: /app
+  # configfile: pytest.ini
+  # testpaths: tests
+  # plugins: anyio-4.6.2.post1
+  # collecting ... collected 1 item
+
+  # tests/test_main.py::test_return_healthcheck PASSED                       [100%]
+
+  # ========================= 1 passed, 1 warning in 0.71s =========================
+```
+
+#### 6. Pytest - Setup Dependencies & Test Todos
+
+> To test `read_all` we'll need to pass MOCK arguments (as in `async def read_all(user:user_dependency,db:db_dependency):`)
+
+1. **Test Database**
+   1. create a fake database that can store data (VS prod database)
+   2. create testing dependencies separate from prod dependencies
+   3. **objective: integration testing**
+
+```py
+# tests/utils.py
+
+from typing import Generator
+
+from fastapi.testclient import TestClient
+import pytest
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from database import Base
+from main import app
+from models import Users, Todos
+from routers.auth import bcrypt_context
+
+
+# Database configuration
+SQLALCHEMY_DATABASE_URL = "sqlite:///./testdb.db"
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base.metadata.create_all(bind=engine)
+
+# Override FastAPI dependencies
+def override_get_db() -> Generator:
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def override_get_current_user() -> dict:
+    return {'username': 'test', 'id': 1, 'user_role': 'admin'}
+
+# Test client
+client = TestClient(app)
+
+# Test fixture for creating and cleaning up a test todo db
+@pytest.fixture
+def test_todo() -> Todos:
+    todo = Todos(
+        title="Learn to code!", description="supdawg", priority=4, complete=False, owner_id=1
+    )
+    db = TestingSessionLocal()
+    db.add(todo)
+    db.commit()
+    yield todo
+    db.query(Todos).delete()  # Cleaner ORM-based deletion
+    db.commit()
+    db.close()
+
+# Test fixture for creating and cleaning up a test user
+@pytest.fixture
+def test_user() -> Todos:
+    user = Users(
+        username="Test", email="test@example.com", first_name="Test", last_name="Example",
+        hashed_password=bcrypt_context.hash("999abc"), role="admin",
+    )
+    db = TestingSessionLocal()
+    db.add(user)
+    db.commit()
+    yield user
+    db.query(Users).delete()  # Cleaner ORM-based deletion
+    db.commit()
+    db.close()
+```
+```py
+# tests/test_todos.py
+
+from fastapi import status
+
+from routers.todos import get_current_user, get_db
+from utils import app, client, override_get_current_user, \
+                  override_get_db, test_todo, TestingSessionLocal, Todos
+
+
+app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_current_user] = override_get_current_user
+
+
+# ===== GET =====
+
+def test_read_all_authenticated(test_todo):
+    response = client.get("/")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == [{
+        'id': 1, 'title': 'Learn to code!', 'description': 'supdawg',
+        'priority': 4, 'complete': False, 'owner_id': 1
+    }]
+
+def test_read_one_authenticated(test_todo):
+    response = client.get("/todo/1")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {
+        'id': 1, 'title': 'Learn to code!', 'description': 'supdawg',
+        'priority': 4, 'complete': False, 'owner_id': 1
+    }
+
+def test_read_one_authenticated_not_found(test_todo):
+    response = client.get("/todo/999")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json() == {'detail': 'Todo not found.'}
+
+# ===== POST =====
+
+def test_create_todo():
+    request_data = {
+        'title': 'New Todo!',
+        'description': 'supdawg',
+        'priority': 3,
+        'complete': False
+    }
+    response = client.post('/todo', json=request_data)
+    assert response.status_code == status.HTTP_201_CREATED
+
+    # Check the database directly for the created record
+    db = TestingSessionLocal()
+    model = db.query(Todos).filter(Todos.title == 'New Todo!').first()
+    db.close()
+    assert model.title == request_data['title']
+    assert model.description == request_data['description']
+    assert model.priority == request_data['priority']
+    assert model.complete == request_data['complete']
+
+# ===== PUT =====
+
+def test_update_todo(test_todo):
+    request_data = {
+        'title': 'Update Todo!',
+        'description': 'supdawg',
+        'priority': 3,
+        'complete': False        
+    }
+    response = client.put('/todo/1', json=request_data)
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    db = TestingSessionLocal()
+    model = db.query(Todos).filter(Todos.id == 1).first()
+    db.close()
+    assert model.title == 'Update Todo!'
+
+def test_update_todo_not_found():
+    request_data = {
+        'title': 'Update Todo!',
+        'description': 'supdawg',
+        'priority': 3,
+        'complete': False        
+    }
+    response = client.put('/todo/999', json=request_data)
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json() == {'detail': 'Todo not found.'}
+
+# ===== DELETE =====
+
+def test_delete_todo(test_todo):
+    response = client.delete('/todo/1')
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    db = TestingSessionLocal()
+    model = db.query(Todos).filter(Todos.id == 1).first()
+    db.close()
+    assert model is None
+
+def test_delete_todo_not_found():
+    response = client.delete('/todo/999')
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json() == {'detail': 'Todo not found.'}
+```
+```bash
+docker exec fastapi pytest -vvv --disable-warnings
+  # ============================= test session starts ==============================
+  # platform linux -- Python 3.12.7, pytest-8.3.3, pluggy-1.5.0 -- /usr/local/bin/python3.12
+  # cachedir: .pytest_cache
+  # rootdir: /app
+  # configfile: pytest.ini
+  # testpaths: tests
+  # plugins: anyio-4.6.2.post1
+  # collecting ... collected 9 items
+
+  # tests/test_main.py::test_return_healthcheck PASSED                       [ 11%]
+  # tests/test_todos.py::test_read_all_authenticated PASSED                  [ 22%]
+  # tests/test_todos.py::test_read_one_authenticated PASSED                  [ 33%]
+  # tests/test_todos.py::test_read_one_authenticated_not_found PASSED        [ 44%]
+  # tests/test_todos.py::test_create_todo PASSED                             [ 55%]
+  # tests/test_todos.py::test_update_todo PASSED                             [ 66%]
+  # tests/test_todos.py::test_update_todo_not_found PASSED                   [ 77%]
+  # tests/test_todos.py::test_delete_todo PASSED                             [ 88%]
+  # tests/test_todos.py::test_delete_todo_not_found PASSED                   [100%]
+
+  # ========================= 9 passed, 1 warning in 0.74s =========================
+```
+
+#### 7. Pytest - Test all routers
+
+```py
+# tests/test_admin.py
+
+from fastapi import status
+
+from routers.admin import get_current_user, get_db
+from utils import app, client, override_get_current_user, \
+                  override_get_db, test_todo, TestingSessionLocal, Todos
+
+
+app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_current_user] = override_get_current_user
+
+
+# ===== GET =====
+
+def test_admin_read_all_authenticated(test_todo):
+    response = client.get("/admin/todo")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == [{
+        'id': 1, 'title': 'Learn to code!', 'description': 'supdawg',
+        'priority': 4, 'complete': False, 'owner_id': 1
+    }]
+
+# ===== DELETE =====
+
+def test_admin_delete_todo(test_todo):
+    response = client.delete("/admin/todo/1")
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    db = TestingSessionLocal()
+    model = db.query(Todos).filter(Todos.id == 1).first()
+    db.close()
+    assert model is None
+
+def test_admin_delete_todo_not_found():
+    response = client.delete("/admin/todo/999")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json() == {'detail': 'Todo not found.'}
+```
+
+```py
+# tests/test_users.py
+
+from fastapi import status
+
+from routers.users import get_current_user, get_db
+from utils import app, client, override_get_current_user, \
+                  override_get_db, test_user, TestingSessionLocal, Todos
+
+
+app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_current_user] = override_get_current_user
+
+
+# ===== GET =====
+
+def test_return_user(test_user):
+    response = client.get("/user")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()['username'] == 'Test'
+    assert response.json()['first_name'] == 'Test'
+    assert response.json()['last_name'] == 'Example'
+    assert response.json()['email'] == 'test@example.com'
+    assert response.json()['role'] == 'admin'
+
+# ===== PUT =====
+
+def test_change_password_sucess(test_user):
+    response = client.put("/user/password", json={
+        "password": "999abc", "new_password": "666xyz"
+    })
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+
+def test_change_password_invalid_current_password(test_user):
+    response = client.put("/user/password", json={
+        "password": "xxxxxx", "new_password": "666xyz"
+    })
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert response.json() == {'detail': 'Error on password change'}
+```
+```py
+# test_auth.py
+
+from datetime import timedelta
+
+from fastapi import status, HTTPException
+from jose import jwt
+import pytest
+
+from routers.auth import authenticate_user, create_access_token, \
+                         get_current_user, get_db, SECRET_KEY, ALGORITHM
+from utils import app, client, override_get_current_user, \
+                  override_get_db, test_user, TestingSessionLocal, Todos
+
+
+app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_current_user] = override_get_current_user
+
+
+# ===== ... =====
+
+def test_authenticate_user(test_user):
+    db = TestingSessionLocal()
+
+    authenticated_user = authenticate_user(test_user.username, '999abc', db)
+    assert authenticated_user is not None
+    assert authenticated_user.username == test_user.username
+
+    non_existent_user = authenticate_user('Wrong_Username', '999abc', db)
+    assert non_existent_user is False
+
+    wrong_password_user = authenticate_user(test_user.username, 'xxxxxx', db)
+    assert wrong_password_user is False
+
+
+def test_create_access_token():
+    username = 'Test'
+    user_id = 1
+    role = 'user'
+    expires_delta = timedelta(days=1)
+
+    token = create_access_token(username, user_id, role, expires_delta)
+    decoded_token = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
+    assert decoded_token['sub'] == username
+    assert decoded_token['id'] == user_id
+    assert decoded_token['role'] == role
+
+@pytest.mark.asyncio
+async def test_get_current_user_valid_token():
+    encode = {'sub': 'testuser', 'id': 1, 'role': 'admin'}
+    token = jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
+
+    user = await get_current_user(token=token)
+    assert user ==  {'username': 'testuser', 'id': 1, 'user_role': 'admin'}
+    
+@pytest.mark.asyncio
+async def test_get_current_user_missing_payload():
+    encode = {'role': 'admin'}
+    token = jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
+
+    with pytest.raises(HTTPException) as excinfo:
+        await get_current_user(token=token)
+
+    assert excinfo.value.status_code == status.HTTP_401_UNAUTHORIZED
+    assert excinfo.value.detail == 'Could not validate user'
+```
+
+```bash
+docker exec fastapi pytest -vvv --disable-warnings
+  # /usr/local/lib/python3.12/site-packages/pytest_asyncio/plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+  # The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  #   warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+  # ============================= test session starts ==============================
+  # platform linux -- Python 3.12.7, pytest-8.3.3, pluggy-1.5.0 -- /usr/local/bin/python3.12
+  # cachedir: .pytest_cache
+  # rootdir: /app
+  # configfile: pytest.ini
+  # testpaths: tests
+  # plugins: anyio-4.6.2.post1, asyncio-0.24.0
+  # asyncio: mode=Mode.STRICT, default_loop_scope=None
+  # collecting ... collected 19 items
+
+  # tests/test_admin.py::test_admin_read_all_authenticated PASSED            [  5%]
+  # tests/test_admin.py::test_admin_delete_todo PASSED                       [ 10%]
+  # tests/test_admin.py::test_admin_delete_todo_not_found PASSED             [ 15%]
+  # tests/test_auth.py::test_authenticate_user PASSED                        [ 21%]
+  # tests/test_auth.py::test_create_access_token PASSED                      [ 26%]
+  # tests/test_auth.py::test_get_current_user_valid_token PASSED             [ 31%]
+  # tests/test_auth.py::test_get_current_user_missing_payload PASSED         [ 36%]
+  # tests/test_main.py::test_return_healthcheck PASSED                       [ 42%]
+  # tests/test_todos.py::test_read_all_authenticated PASSED                  [ 47%]
+  # tests/test_todos.py::test_read_one_authenticated PASSED                  [ 52%]
+  # tests/test_todos.py::test_read_one_authenticated_not_found PASSED        [ 57%]
+  # tests/test_todos.py::test_create_todo PASSED                             [ 63%]
+  # tests/test_todos.py::test_update_todo PASSED                             [ 68%]
+  # tests/test_todos.py::test_update_todo_not_found PASSED                   [ 73%]
+  # tests/test_todos.py::test_delete_todo PASSED                             [ 78%]
+  # tests/test_todos.py::test_delete_todo_not_found PASSED                   [ 84%]
+  # tests/test_users.py::test_return_user PASSED                             [ 89%]
+  # tests/test_users.py::test_change_password_sucess PASSED                  [ 94%]
+  # tests/test_users.py::test_change_password_invalid_current_password PASSED [100%]
+
+  # ======================== 19 passed, 2 warnings in 2.50s ========================
+
+# ---
+docker exec fastapi pytest
+  # /usr/local/lib/python3.12/site-packages/pytest_asyncio/plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+  # The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  #   warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+  # ============================= test session starts ==============================
+  # platform linux -- Python 3.12.7, pytest-8.3.3, pluggy-1.5.0
+  # rootdir: /app
+  # configfile: pytest.ini
+  # testpaths: tests
+  # plugins: anyio-4.6.2.post1, asyncio-0.24.0
+  # asyncio: mode=Mode.STRICT, default_loop_scope=None
+  # collected 19 items
+
+  # tests/test_admin.py ...                                                  [ 15%]
+  # tests/test_auth.py ....                                                  [ 36%]
+  # tests/test_main.py .                                                     [ 42%]
+  # tests/test_todos.py ........                                             [ 84%]
+  # tests/test_users.py ...                                                  [100%]
+
+  # =============================== warnings summary ===============================
+  # ../usr/local/lib/python3.12/site-packages/passlib/utils/__init__.py:854
+  #   /usr/local/lib/python3.12/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+  #     from crypt import crypt as _crypt
+
+  # tests/test_auth.py::test_create_access_token
+  #   /usr/local/lib/python3.12/site-packages/jose/jwt.py:311: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  #     now = timegm(datetime.utcnow().utctimetuple())
+
+  # -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+  # ======================== 19 passed, 2 warnings in 2.50s ========================
+```
+
+</details>
+
+
+#### 8. CUSTOM: CI/CD
+
+> [!IMPORTANT]
+> **WIP**
+
+
+
+
+
 ## 15. Project 5 - Full Stack Application
 ## 16. Git - Version Control
 ## 17. Deploying FastAPI Applications
