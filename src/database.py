@@ -23,10 +23,10 @@ POSTGRES_DB = os.getenv('POSTGRES_DB',"fastapi")
 #     SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 #     engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
-# SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 
-SQLALCHEMY_DATABASE_URL='sqlite:///./todosapp.db'
-engine = create_engine(SQLALCHEMY_DATABASE_URL,connect_args={'check_same_thread':False})
+# SQLALCHEMY_DATABASE_URL='sqlite:///./todosapp.db'
+# engine = create_engine(SQLALCHEMY_DATABASE_URL,connect_args={'check_same_thread':False})
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
