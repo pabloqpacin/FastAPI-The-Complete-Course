@@ -5,6 +5,9 @@ name: Run Unit Test via Pytest
 
 on:
   push:
+    branches:
+      - "main"
+      - "devel"
     paths:
       - "03-todos-database"
 
