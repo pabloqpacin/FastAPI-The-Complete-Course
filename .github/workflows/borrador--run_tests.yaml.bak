@@ -59,4 +59,3 @@ jobs:
       - name: Run Pytest
         run: |
           pytest
-          pip install -r 03-todos-database/requirements.txt

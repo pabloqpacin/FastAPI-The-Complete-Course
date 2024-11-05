@@ -29,17 +29,21 @@ jobs:
           USE_SQLITE: "true"
           DATABASE_URL: "sqlite:///./test.db"
 
-      - name: Lint with Ruff
-        run: |
-          pip install ruff
-          ruff src --format=github --target-version=py310
-        continue-on-error: true
+      # - name: Lint with Ruff
+      #   run: |
+      #     pip install ruff
+      #     ruff src --format=github --target-version=py310
+      #   continue-on-error: true
 
-      - name: Test with pytest and Coverage
-        run: |
-          pip install coverage
-          coverage run -m pytest tests -v -s
+      # - name: Test with pytest and Coverage
+      #   run: |
+      #     pip install coverage
+      #     coverage run -m pytest tests -v -s
 
-      - name: Generate Coverage Report
+      # - name: Generate Coverage Report
+      #   run: |
+      #     coverage report --source=src -m
+
+      - name: Run Pytest
         run: |
-          coverage report --source=src -m
+          pytest
