@@ -1,8 +1,9 @@
-import os
 from dotenv import load_dotenv
+import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+
 
 load_dotenv(dotenv_path="../.env.development", override=True)
 
@@ -13,10 +14,9 @@ POSTGRES_PORT = os.getenv('POSTGRES_PORT',5432)
 POSTGRES_DB = os.getenv('POSTGRES_DB',"fastapi")
 
 USE_SQLITE = os.getenv('USE_SQLITE', 'false').lower() == 'true'
-# USE_SQLITE = True
 
 if USE_SQLITE:
-    # SQLite configuration for testing
+    # SQLite configuration for Testing with GH Actions
     SQLALCHEMY_DATABASE_URL = 'sqlite:///./test.db'
     engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={'check_same_thread': False})
 else:
@@ -24,15 +24,9 @@ else:
     SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
     engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
-# SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
-
-# SQLALCHEMY_DATABASE_URL='sqlite:///./todosapp.db'
-# engine = create_engine(SQLALCHEMY_DATABASE_URL,connect_args={'check_same_thread':False})
-
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
 SessionLocal = sessionmaker(autocommit=False,autoflush=False,bind=engine)
 
 Base = declarative_base()
-
 

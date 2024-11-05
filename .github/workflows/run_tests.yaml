@@ -1,13 +1,16 @@
+# https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions
 # https://github.com/fastapi/full-stack-fastapi-template/tree/master/.github%2Fworkflows
 ---
 
-name: Run Pytest and Else
+name: Run Pytest
 
 on:
   push:
     branches:
       - main
       - devel
+    paths:
+      - 'src/**'
 
 jobs:
   build:
@@ -38,7 +41,7 @@ jobs:
       #     ruff src --format=github --target-version=py310
       #   continue-on-error: true
 
-      - name: Test with pytest and Coverage
+      - name: Run tests with Pytest and Coverage
         run: |
           coverage run -m pytest -v
 
@@ -46,10 +49,7 @@ jobs:
         run: |
           coverage report -m
 
-      # - run: docker compose down -v --remove-orphans
       # - run: docker compose up -d
+      # - run: docker compose down -v --remove-orphans
 
-      # - name: Run Pytest
-      #   run: |
-      #     pytest
 
