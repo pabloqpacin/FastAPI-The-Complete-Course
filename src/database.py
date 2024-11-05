@@ -12,18 +12,19 @@ POSTGRES_HOST = os.getenv('POSTGRES_HOST', "postgresql")
 POSTGRES_PORT = os.getenv('POSTGRES_PORT',5432)
 POSTGRES_DB = os.getenv('POSTGRES_DB',"fastapi")
 
-# USE_SQLITE = os.getenv('USE_SQLITE', 'false').lower() == 'true'
+USE_SQLITE = os.getenv('USE_SQLITE', 'false').lower() == 'true'
+# USE_SQLITE = True
 
-# if USE_SQLITE:
-#     # SQLite configuration for testing
-#     SQLALCHEMY_DATABASE_URL = 'sqlite:///./test.db'
-#     engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={'check_same_thread': False})
-# else:
-#     # Default PostgreSQL configuration
-#     SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
-#     engine = create_engine(SQLALCHEMY_DATABASE_URL)
+if USE_SQLITE:
+    # SQLite configuration for testing
+    SQLALCHEMY_DATABASE_URL = 'sqlite:///./test.db'
+    engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={'check_same_thread': False})
+else:
+    # Default PostgreSQL configuration
+    SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+    engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
-SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+# SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 
 # SQLALCHEMY_DATABASE_URL='sqlite:///./todosapp.db'
 # engine = create_engine(SQLALCHEMY_DATABASE_URL,connect_args={'check_same_thread':False})

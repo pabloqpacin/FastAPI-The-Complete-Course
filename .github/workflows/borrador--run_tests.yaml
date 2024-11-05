@@ -30,25 +30,28 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Set up Sqlite DB only for GH Actions
+        run: |
+          echo "USE_SQLITE=true" >> .env
+
       # - name: Lint with Ruff
       #   run: |
       #     pip install ruff
       #     ruff src --format=github --target-version=py310
       #   continue-on-error: true
 
-      # - name: Test with pytest and Coverage
-      #   run: |
-      #     pip install coverage
-      #     coverage run -m pytest tests -v -s
-
-      # - name: Generate Coverage Report
-      #   run: |
-      #     coverage report --source=src -m
-
-      - run: docker compose down -v --remove-orphans
-      - run: docker compose up -d
-
-      - name: Run Pytest
+      - name: Test with pytest and Coverage
         run: |
-          pytest
+          coverage run -m pytest -v
+
+      - name: Generate Coverage Report
+        run: |
+          coverage report -m
+
+      # - run: docker compose down -v --remove-orphans
+      # - run: docker compose up -d
+
+      # - name: Run Pytest
+      #   run: |
+      #     pytest
 
