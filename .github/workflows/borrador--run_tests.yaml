@@ -1,4 +1,7 @@
-name: Run Unit Test via Pytest
+# https://github.com/fastapi/full-stack-fastapi-template/tree/master/.github%2Fworkflows
+---
+
+name: Run Pytest and Else
 
 on:
   push:
@@ -43,7 +46,7 @@ jobs:
       #     coverage report --source=src -m
 
       - run: docker compose down -v --remove-orphans
-      - run: docker compose up
+      - run: docker compose up -d
 
       - name: Run Pytest
         run: |
